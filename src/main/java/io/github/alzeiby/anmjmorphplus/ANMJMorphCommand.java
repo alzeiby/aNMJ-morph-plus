@@ -63,6 +63,14 @@ public class ANMJMorphCommand implements Command {
             ImagePlus image = WindowManager.getCurrentImage();
             Path path = null;
             if (image == null) {
+                final GenericDialog mode = new GenericDialog("aNMJ-morph+");
+                mode.addChoice("Analyze", new String[] {"Single image", "Batch folder"}, "Single image");
+                mode.showDialog();
+                if (mode.wasCanceled()) return;
+                if (mode.getNextChoiceIndex() == 1) {
+                    runBatch();
+                    return;
+                }
                 final OpenDialog file = new OpenDialog("Select image to analyze");
                 if (file.getPath() == null) return;
                 path = Path.of(file.getPath());
@@ -75,6 +83,7 @@ public class ANMJMorphCommand implements Command {
             IJ.error("aNMJ-morph+", e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
         }
     }
+
     private static void analyze(ImagePlus image, final Path path) {
         final boolean twoPlanesAsChannels = image.getBitDepth() != 24 && image.getNChannels() == 1 &&
             image.getNSlices() == 2 && chooseTwoPlanesAsChannels();
@@ -90,6 +99,50 @@ public class ANMJMorphCommand implements Command {
         }
         final int[] channels = chooseChannels(image.getNChannels());
         new AnalysisWorkflow().analyze(image, path, channels[0], channels[1]);
+    }
+
+    private static void runBatch() {
+        final String directory = new DirectoryChooser("Select directory with images to process").getDirectory();
+        if (directory == null) return;
+        final Path root = Path.of(directory);
+        int succeeded = 0;
+        int failed = 0;
+        for (Path file : discover(root)) {
+            try {
+                final ImagePlus image = load(file);
+                image.show();
+                analyze(image, file);
+                succeeded++;
+            } catch (Cancelled e) {
+                break;
+            } catch (RuntimeException e) {
+                failed++;
+                IJ.log("aNMJ-morph+ batch failed for " + file + ": " +
+                    (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
+            } finally {
+                closeAllImages();
+            }
+        }
+        IJ.log("aNMJ-morph+ batch: " + succeeded + " succeeded, " + failed + " failed");
+    }
+
+    static List<Path> discover(final Path root) {
+        try (Stream<Path> stream = Files.walk(root)) {
+            return stream.filter(Files::isRegularFile)
+                .filter(ANMJMorphCommand::supported)
+                .filter(path -> !generated(root.relativize(path)))
+                .sorted(Comparator.comparing(path -> root.relativize(path).toString().toLowerCase(Locale.ROOT)))
+                .collect(Collectors.toList());
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not enumerate batch folder: " + root, e);
+        }
+    }
+
+    private static boolean generated(final Path relative) {
+        final Path parent = relative.getParent();
+        return parent != null && StreamSupport.stream(parent.spliterator(), false)
+            .map(part -> part.toString().toLowerCase(Locale.ROOT))
+            .anyMatch(name -> name.equals("cleaned_images") || name.equals(".anmj-morph-plus"));
     }
 
     static ImagePlus load(final Path path) {
