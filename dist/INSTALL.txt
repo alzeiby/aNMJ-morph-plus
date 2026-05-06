@@ -1,0 +1,27 @@
+aNMJ-morph+ v0.1.0
+
+Requires Fiji: https://fiji.sc/
+
+1. Copy anmj-morph-plus-0.1.0.jar into Fiji's plugins/ folder.
+2. Restart Fiji.
+3. Run Analyze > Tools > aNMJ-morph+.
+
+To crop, draw a rectangle and click Continue. With no selection, the full image is used.
+For images without calibration, use pixels or enter microns per pixel.
+Calibrated ND2/CZI/LSM/LIF images keep physical units through projection and crop.
+Only uncalibrated or unit-ambiguous images require a scale confirmation.
+The channel prompt remembers the previous muscle and nerve selections.
+During thresholding, compare the raw image on the left with the working image on the right.
+Measure axon widths in order: maximum, minimum, hillock. Press M after each line.
+The brush starts at 12 px unless you have a saved size. Double-click its icon to adjust.
+Automatic endplate segmentation shows white clusters on black background.
+Clear narrow necks may be automatically separated; ring holes are preserved.
+No manual drawing is required for cluster separation.
+Uncheck Image looks OK if needed.
+Processing begins at 0% after axon cleanup and advances only after nerve,
+skeleton, endplate, segmentation, counting and export stages actually complete.
+100% requires verifying the saved TIFF and CSV outputs and finishing cleanup.
+Cancellation or failure does not claim a successful 100% completion.
+Only the original endplate and segmented preview appear at confirmation.
+After confirmation, the plugin rapidly counts the segmented components and saves
+the segmentation TIFF and CSV. Automated splits are conservative estimates.
