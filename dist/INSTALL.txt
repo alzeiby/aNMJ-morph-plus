@@ -1,0 +1,15 @@
+aNMJ-morph+ v0.1.0
+
+Requires Fiji: https://fiji.sc/
+
+1. Copy anmj-morph-plus-0.1.0.jar into Fiji's plugins/ folder.
+2. Restart Fiji.
+3. Run Analyze > Tools > aNMJ-morph+.
+
+To crop, draw a rectangle and click Continue. With no selection, the full image is used.
+For images without calibration, use pixels or enter microns per pixel.
+The channel prompt remembers the previous muscle and nerve selections.
+During thresholding, compare the raw image on the left with the working image on the right.
+Measure axon widths in order: maximum, minimum, hillock. Press M after each line.
+The brush starts at 12 px unless you have a saved size. Double-click its icon to adjust.
+The segmented endplate preview uses the cleaned mask. Uncheck Image looks OK if needed.
