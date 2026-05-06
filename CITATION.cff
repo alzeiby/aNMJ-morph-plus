@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use aNMJ-morph+ in your research, please cite this repository and the aNMJ-morph paper listed in the README."
+title: "aNMJ-morph+"
+type: software
+authors:
+  - family-names: "Alzeiby"
+    given-names: "Abdullah"
+    orcid: "https://orcid.org/0009-0004-2956-5766"
+repository-code: "https://github.com/alzeiby/aNMJ-morph-plus"
+license: MIT
+version: "0.1.0"
+date-released: 2026-05-06
+abstract: "Fiji/ImageJ plugin for quantitative neuromuscular junction morphology analysis."
+keywords:
+  - neuromuscular junction
+  - image analysis
+  - Fiji
+  - ImageJ
+  - microscopy
