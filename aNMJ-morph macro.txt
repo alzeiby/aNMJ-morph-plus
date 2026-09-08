@@ -17,7 +17,7 @@ function printIfEnabled(message) {
 }
 
 function safeSelectWindow(windowTitle) {
-  if (getTitle() == windowTitle) {
+  if (getInfo("window.title") == windowTitle) {
     return;
   }
   wait(100);

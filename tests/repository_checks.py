@@ -94,7 +94,14 @@ def main() -> None:
     require("safeSelectWindow(list[0]);" in MACRO, "The first listed image is not explicitly selected before analysis")
 
     # Avoid unnecessary UI and measurement work in the interactive path.
-    require("if (getTitle() == windowTitle)" in MACRO, "Redundant window selections are not short-circuited")
+    require(
+        'if (getInfo("window.title") == windowTitle)' in MACRO,
+        "Redundant window selections are not short-circuited using the front-most window",
+    )
+    require(
+        "if (getTitle() == windowTitle)" not in MACRO,
+        "Window short-circuit must not use the current image title for non-image windows",
+    )
     require("getLocationAndSize(x2, y2, width2, height2);" not in MACRO, "Unused template-window geometry query returned")
     require("resultsArray = newArray(resultsCount);" in MACRO, "Axon measurement array is not preallocated")
     require("Array.concat(resultsArray" not in MACRO, "Axon measurements still reallocate the array on each result")
