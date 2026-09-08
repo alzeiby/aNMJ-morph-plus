@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - fix/**
+      - docs/**
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  repository-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile repository checks
+        run: python -m py_compile tests/repository_checks.py
+
+      - name: Run repository checks
+        run: python tests/repository_checks.py
+
+      - name: Check whitespace errors
+        run: git diff --check HEAD~1 HEAD
+
+      - name: Smoke-test release packaging
+        run: bash scripts/package_release.sh ci-smoke
+
+      - name: Verify release artifacts
+        shell: bash
+        run: |
+          test -s dist/aNMJ-morph-plus-ci-smoke.zip
+          test -s dist/aNMJ-morph-plus-ci-smoke.zip.sha256
+          cd dist
+          sha256sum -c aNMJ-morph-plus-ci-smoke.zip.sha256

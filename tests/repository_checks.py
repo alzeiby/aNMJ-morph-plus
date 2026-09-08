@@ -1,0 +1,126 @@
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+MACRO_PATH = ROOT / "aNMJ-morph macro.txt"
+MACRO = MACRO_PATH.read_text(encoding="utf-8")
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        raise AssertionError(message)
+
+
+def check_balanced_delimiters(text: str) -> None:
+    pairs = {")": "(", "]": "[", "}": "{"}
+    opening = set(pairs.values())
+    stack = []
+    in_string = False
+    escaped = False
+    in_line_comment = False
+    i = 0
+
+    while i < len(text):
+        char = text[i]
+        nxt = text[i + 1] if i + 1 < len(text) else ""
+
+        if in_line_comment:
+            if char == "\n":
+                in_line_comment = False
+            i += 1
+            continue
+
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            i += 1
+            continue
+
+        if char == "/" and nxt == "/":
+            in_line_comment = True
+            i += 2
+            continue
+        if char == '"':
+            in_string = True
+            i += 1
+            continue
+
+        if char in opening:
+            stack.append(char)
+        elif char in pairs:
+            require(stack and stack[-1] == pairs[char], f"Unbalanced delimiter near character {i}: {char}")
+            stack.pop()
+        i += 1
+
+    require(not in_string, "Unterminated string literal")
+    require(not stack, f"Unclosed delimiter(s): {stack}")
+
+
+def main() -> None:
+    require(MACRO_PATH.exists(), "Macro file is missing")
+    check_balanced_delimiters(MACRO)
+
+    # Rectangular-image calculation must use width * height, not the original square assumption.
+    require(
+        "totalLengthOfBranches = (imageWidth * imageHeight - counts0) * pixelSizeX;" in MACRO,
+        "Rectangular branch-length calculation is missing",
+    )
+    require(
+        "(A' + rowNumber + '*A' + rowNumber" not in MACRO,
+        "Legacy square-only branch-length spreadsheet formula returned",
+    )
+
+    # Dimensionality handling must not silently reinterpret ambiguous data.
+    require("if (frames > 1)" in MACRO, "Time-series inputs are not explicitly rejected")
+    require("Two-plane image detected" in MACRO, "Ambiguous C=1/Z=2 inputs are not surfaced to the user")
+    require("Two channels (Keyence/two-page export)" in MACRO, "Keyence two-page interpretation option is missing")
+    require("Z stack (maximum-project)" in MACRO, "Z-stack interpretation option is missing")
+
+    # The primary, threshold template, and segmentation copy must use the same channel ordering.
+    arrange_call = 'run("Arrange Channels...", "new=" + muscleEndplateChannel + \'\' + nerveTerminalChannel);'
+    require(MACRO.count(arrange_call) >= 3, "Channel ordering is not applied consistently to all analysis copies")
+
+    # Batch processing must support TIFF rather than excluding it globally.
+    require('endsWith(lowerName, ".tif")' in MACRO, "TIFF is not included in supported batch formats")
+    require('endsWith(lowerName, ".tiff")' in MACRO, "TIFF extension variant is not supported")
+    require('if (!endsWith(fileName, ".tif"))' not in MACRO, "Legacy TIFF-wide batch exclusion returned")
+    require("cleaned_images" in MACRO, "Generated output directory is not excluded from recursive batch traversal")
+
+    # Multiple-open-image mode must explicitly select the image it passes to processOpenImage.
+    require("safeSelectWindow(list[0]);" in MACRO, "The first listed image is not explicitly selected before analysis")
+
+    # Diagnostic mode must remain useful.
+    diagnostic_markers = [
+        "Axon diameter:",
+        "Nerve terminal area:",
+        "Nerve terminal perimeter:",
+        "AChR area:",
+        "AChR perimeter:",
+        "Endplate diameter:",
+        "Endplate area:",
+        "Endplate perimeter:",
+        "Unoccupied AChR Area:",
+        "Number of clusters:",
+    ]
+    for marker in diagnostic_markers:
+        require(marker in MACRO, f"Diagnostic output missing: {marker}")
+
+    # Preserve historical cleaned-image filename prefixes.
+    require('makeTiffFilename("axon_terminal", originalTitle)' in MACRO, "Axon output filename prefix changed")
+    require('makeTiffFilename("muscle_endplate", originalTitle)' in MACRO, "Endplate output filename prefix changed")
+
+    reference_images = sorted((ROOT / "Reference Images").glob("*.lsm"))
+    require(len(reference_images) == 20, f"Expected 20 reference LSM images, found {len(reference_images)}")
+
+    license_text = (ROOT / "license_text").read_text(encoding="utf-8", errors="replace")
+    require("Creative Commons License: Attribution 4.0 International" in license_text, "CC BY 4.0 license text is missing")
+
+    print("Repository checks passed")
+
+
+if __name__ == "__main__":
+    main()
