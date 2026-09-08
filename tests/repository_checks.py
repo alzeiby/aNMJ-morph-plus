@@ -116,8 +116,9 @@ def main() -> None:
     reference_images = sorted((ROOT / "Reference Images").glob("*.lsm"))
     require(len(reference_images) == 20, f"Expected 20 reference LSM images, found {len(reference_images)}")
 
-    license_text = (ROOT / "license_text").read_text(encoding="utf-8", errors="replace")
-    require("Creative Commons License: Attribution 4.0 International" in license_text, "CC BY 4.0 license text is missing")
+    license_text = (ROOT / "LICENSE").read_text(encoding="utf-8", errors="replace")
+    require("Creative Commons Attribution 4.0 International" in license_text, "CC BY 4.0 license notice is missing")
+    require("https://doi.org/10.7488/ds/2625" in license_text, "Original dataset attribution is missing from LICENSE")
 
     print("Repository checks passed")
 
