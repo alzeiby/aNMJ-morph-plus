@@ -90,6 +90,14 @@ def main() -> None:
     require('if (!endsWith(fileName, ".tif"))' not in MACRO, "Legacy TIFF-wide batch exclusion returned")
     require("cleaned_images" in MACRO, "Generated output directory is not excluded from recursive batch traversal")
 
+    # Batch and CSV I/O should avoid unnecessary parsing and rewriting work.
+    require("hasSupportedImageExtension(lowerName)" in MACRO, "Batch extension checks are not using the normalized filename")
+    require("canOpenDirectly(lowerName)" in MACRO, "Native image formats are not opened directly")
+    require('endsWith(lowerName, ".png")' in MACRO, "PNG direct-open support is missing")
+    require('File.append(output, outputFilename);' in MACRO, "CSV rows are not appended incrementally")
+    require("File.saveString(fileContents + output, outputFilename);" not in MACRO, "CSV output still rewrites the entire existing file")
+    require("File.length(outputFilename) > 0" in MACRO, "Empty output files are not handled explicitly")
+
     # Multiple-open-image mode must explicitly select the image it passes to processOpenImage.
     require("safeSelectWindow(list[0]);" in MACRO, "The first listed image is not explicitly selected before analysis")
 
