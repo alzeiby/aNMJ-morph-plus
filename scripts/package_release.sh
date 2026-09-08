@@ -9,7 +9,7 @@ package_dir="${dist_dir}/${package}"
 rm -rf "${package_dir}"
 mkdir -p "${package_dir}"
 
-cp "aNMJ-morph macro.txt" LICENSE "Reference Spreadsheet.xlsx" "${package_dir}/"
+cp "aNMJ-morph macro.txt" LICENSE CITATION.cff "Reference Spreadsheet.xlsx" "${package_dir}/"
 cp -R "Reference Images" "${package_dir}/Reference Images"
 
 if [[ -f README.md ]]; then
