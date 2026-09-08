@@ -17,11 +17,12 @@ function printIfEnabled(message) {
 }
 
 function safeSelectWindow(windowTitle) {
-  if (getInfo("window.title") == windowTitle) {
+  if (nImages > 0 && getInfo("window.title") == windowTitle && getTitle() == windowTitle) {
     return;
   }
   wait(100);
   selectWindow(windowTitle);
+  wait(100);
 }
 
 function safeWaitForUser(message) {
@@ -131,9 +132,11 @@ function processOpenImage(fileName) {
     originalTitle = MAXtitle;
   }
 
-  sourceCopyTitle = "__aNMJ_source_" + getImageID();
+  originalImageId = getImageID();
+  sourceCopyTitle = "__aNMJ_source_" + originalImageId;
   run("Duplicate...", "title=[" + sourceCopyTitle + "] duplicate");
-  safeSelectWindow(originalTitle);
+  sourceCopyId = getImageID();
+  selectImage(originalImageId);
 
   outputFilename = originalDirectory + "raw_data_table.csv";
 
@@ -142,7 +145,7 @@ function processOpenImage(fileName) {
   run("Paintbrush Tool Options...", "brush=100");
 
   getDimensions(imageWidth, imageHeight, numberOfChannels, slices, frames);
-  imageDimensionsPixels = imageWidth + " x " + imageHeight;
+  imageDimensionsPixels = "" + imageWidth + " x " + imageHeight;
   printIfEnabled("Image dimensions (pixels): " + imageDimensionsPixels);
 
   getPixelSize(sizeUnit, pixelSizeX, pixelSizeY);
@@ -151,7 +154,7 @@ function processOpenImage(fileName) {
   }
   metricWidth = pixelSizeX * imageWidth;
   metricHeight = pixelSizeY * imageHeight;
-  imageDimensionsMetric = formatNumber(metricWidth) + " x " + formatNumber(metricHeight) + sizeUnit;
+  imageDimensionsMetric = "" + formatNumber(metricWidth) + " x " + formatNumber(metricHeight) + sizeUnit;
   printIfEnabled("Image dimensions (metric): " + imageDimensionsMetric);
 
   Dialog.create("Welcome");
@@ -185,18 +188,20 @@ function processOpenImage(fileName) {
     exit("Error: No nerve terminal channel was selected");
   }
 
+  selectImage(originalImageId);
   run("Arrange Channels...", "new=" + muscleEndplateChannel + '' + nerveTerminalChannel);
-
-  safeSelectWindow(originalTitle);
+  selectImage(originalImageId);
   Stack.setChannel(1);
   run("Split Channels");
   run("Threshold...");
 
-  safeSelectWindow(sourceCopyTitle);
-  templateTitle = "__aNMJ_template_" + getImageID();
+  selectImage(sourceCopyId);
+  templateTitle = "__aNMJ_template_" + sourceCopyId;
   run("Duplicate...", "title=[" + templateTitle + "] duplicate");
-  safeSelectWindow(templateTitle);
+  templateImageId = getImageID();
+  selectImage(templateImageId);
   run("Arrange Channels...", "new=" + muscleEndplateChannel + '' + nerveTerminalChannel);
+  selectImage(templateImageId);
   Stack.setChannel(1);
   run("Split Channels");
   templateFileName = templateTitle;
@@ -344,12 +349,13 @@ function processOpenImage(fileName) {
   safeSelectWindow("AVG_Concatenated Stacks");
   run("Close");
 
-  safeSelectWindow(sourceCopyTitle);
-  segmentCopyTitle = "__aNMJ_segment_" + getImageID();
+  selectImage(sourceCopyId);
+  segmentCopyTitle = "__aNMJ_segment_" + sourceCopyId;
   run("Duplicate...", "title=[" + segmentCopyTitle + "] duplicate");
-  safeSelectWindow(segmentCopyTitle);
-
+  segmentImageId = getImageID();
+  selectImage(segmentImageId);
   run("Arrange Channels...", "new=" + muscleEndplateChannel + '' + nerveTerminalChannel);
+  selectImage(segmentImageId);
   Stack.setChannel(1);
 
   run("Split Channels");

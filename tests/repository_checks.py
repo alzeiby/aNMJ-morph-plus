@@ -95,7 +95,7 @@ def main() -> None:
 
     # Avoid unnecessary UI and measurement work in the interactive path.
     require(
-        'if (getInfo("window.title") == windowTitle)' in MACRO,
+        'if (nImages > 0 && getInfo("window.title") == windowTitle && getTitle() == windowTitle)' in MACRO,
         "Redundant window selections are not short-circuited using the front-most window",
     )
     require(
@@ -105,6 +105,23 @@ def main() -> None:
     require("getLocationAndSize(x2, y2, width2, height2);" not in MACRO, "Unused template-window geometry query returned")
     require("resultsArray = newArray(resultsCount);" in MACRO, "Axon measurement array is not preallocated")
     require("Array.concat(resultsArray" not in MACRO, "Axon measurements still reallocate the array on each result")
+
+    # Stateful ImageJ channel operations must target deterministic image IDs.
+    require("originalImageId = getImageID();" in MACRO, "Original image ID is not captured before duplication")
+    require("sourceCopyId = getImageID();" in MACRO, "Source-copy image ID is not captured")
+    require("templateImageId = getImageID();" in MACRO, "Template image ID is not captured")
+    require("segmentImageId = getImageID();" in MACRO, "Segmentation image ID is not captured")
+    require(MACRO.count("selectImage(originalImageId);") >= 3, "Original analysis flow is not image-ID selected")
+    require(MACRO.count("selectImage(templateImageId);") >= 2, "Template Arrange/Split flow is not image-ID selected")
+    require(MACRO.count("selectImage(segmentImageId);") >= 2, "Stage-6 Arrange/Split flow is not image-ID selected")
+    require(
+        'imageDimensionsPixels = "" + imageWidth + " x " + imageHeight;' in MACRO,
+        "Pixel dimensions do not force ImageJ string context",
+    )
+    require(
+        'imageDimensionsMetric = "" + formatNumber(metricWidth) + " x " + formatNumber(metricHeight) + sizeUnit;' in MACRO,
+        "Metric dimensions do not force ImageJ string context",
+    )
 
     # Diagnostic mode must remain useful.
     diagnostic_markers = [
