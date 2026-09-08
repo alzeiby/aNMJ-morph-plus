@@ -87,7 +87,7 @@ The repository also contains the original tutorial video, 20 reference NMJ image
 
 GitHub Actions runs repository checks on pushes and pull requests. The checks cover the rectangular-image formula, ambiguous C/Z handling, time-series rejection, consistent channel ordering, TIFF batch support, diagnostic output, historical output naming, the bundled reference-image count, and basic macro delimiter/string integrity.
 
-Tags matching `v*` run the same validation and then publish a GitHub release containing the macro, README, licenses, reference spreadsheet, reference images, and a SHA-256 checksum.
+Tags matching `v*` run the same validation and then publish a GitHub release containing the macro, README, `LICENSE`, reference spreadsheet, reference images, and a SHA-256 checksum.
 
 ## Scientific-use note
 
@@ -107,8 +107,8 @@ This repository is derived from the aNMJ-morph macro and supporting dataset crea
 
 ## License and provenance
 
-The original Edinburgh DataShare distribution uses the Creative Commons Attribution 4.0 International license. The full legal text is retained as `license_text`, and the original Edinburgh DataShare depositor agreement is retained as `license.txt`.
+The original Edinburgh DataShare distribution uses the Creative Commons Attribution 4.0 International license. This repository consolidates the applicable license, original-source attribution, modification notice, and links to the complete CC BY 4.0 terms in `LICENSE`.
 
-Fork-authored modifications in this repository are also made available under **CC BY 4.0** unless otherwise noted. `LICENSE` provides the repository-level licensing notice and points to the retained full legal text.
+Fork-authored modifications in this repository are also made available under **CC BY 4.0** unless otherwise noted.
 
 When redistributing modified versions, preserve attribution to the original creators, link to the source dataset, identify that changes were made, and retain the applicable license information.
