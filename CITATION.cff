@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use aNMJ-morph+ in your research, please cite this software and the original aNMJ-morph work listed in the README."
+title: "aNMJ-morph+"
+type: software
+authors:
+  - family-names: "Alzeiby"
+    given-names: "Abdullah"
+repository-code: "https://github.com/alzeiby/aNMJ-morph-plus"
+license: "CC-BY-4.0"
+abstract: "A maintained adaptation of aNMJ-morph with rectangular-image support, safer image dimensionality handling, and automated repository validation."
+keywords:
+  - neuromuscular junction
+  - image analysis
+  - Fiji
+  - ImageJ
+  - microscopy
