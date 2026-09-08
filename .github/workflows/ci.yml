@@ -33,3 +33,13 @@ jobs:
 
       - name: Check whitespace errors
         run: git diff --check HEAD~1 HEAD
+
+      - name: Smoke-test release packaging
+        run: bash scripts/package_release.sh ci-smoke
+
+      - name: Verify release artifacts
+        shell: bash
+        run: |
+          test -s dist/aNMJ-morph-plus-ci-smoke.zip
+          test -s dist/aNMJ-morph-plus-ci-smoke.zip.sha256
+          sha256sum -c dist/aNMJ-morph-plus-ci-smoke.zip.sha256
