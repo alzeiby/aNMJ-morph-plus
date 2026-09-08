@@ -6,7 +6,6 @@ decimalSeparator = '.'; /* '.' by default, ',' if run on German machines */
 printIntermediateResults = false;
 decimalPlaces = 8;
 
-
 function formatNumber(number) {
   return replace(d2s(number, 8), '.', decimalSeparator);
 }
@@ -18,20 +17,13 @@ function printIfEnabled(message) {
 }
 
 function safeSelectWindow(windowTitle) {
-  // Running selectWindow while the layout engine is in progress may result in 
-  // undefined behaviour. Waiting for a short period resolves the issue.
-  // 100ms seems to be enough delay while not slowing down macro execution too 
-  // much.
   wait(100);
   selectWindow(windowTitle);
 }
 
 function safeWaitForUser(message) {
-  // Store the current window title, display a message to the user and restore 
-  // focus to that image.
   currentImageId = getImageID();
   waitForUser(message);
-  // Don't focus the old window if none was selected.
   wait(100);
   selectImage(currentImageId);
 }
@@ -44,24 +36,40 @@ function makeTiffFilename(prefix, title) {
   return prefix + title + ".tif";
 }
 
-// Install Paintbrush Tool Options & other StartupMacros - 
-// FIJI has a bug where it kicks out all StartupMacros when installing a Macro
+// Install Paintbrush Tool Options & other StartupMacros
 macrosDirectory = getDirectory("macros");
 run("Install...", "install="+macrosDirectory+File.separator+"StartupMacros.fiji.ijm");
 
+function normalizeChannels() {
+  getDimensions(width, height, numberOfChannels, slices, frames);
+
+  if (numberOfChannels == 1 && frames == 1) {
+    if (bitDepth() == 24 && slices == 1) {
+      run("RGB Stack");
+      run("Properties...", "channels=3 slices=1 frames=1");
+      run("Make Composite", "display=Composite");
+    } else if (slices == 2) {
+      // Two-page Keyence MIP exports can open as Z slices instead of channels.
+      run("Properties...", "channels=2 slices=1 frames=1");
+    }
+  }
+}
+
 list = getList("image.titles");
 if (list.length == 0) {
-  // If no image is open, Go into batch mode. Ask for a directory
   directory = getDirectory("Select directory with images to process");
   batchProcess(directory);
 } else {
-  // Process the currently open image
   processOpenImage(list[0]);
 }
 
 function processOpenImage(fileName) {
+  
+  normalizeChannels();
+
   originalTitle = getTitle();
   originalDirectory = getDirectory("image");
+
   if (originalDirectory == "") {
     originalDirectory = getDirectory("Select folder for analysis output");
     if (originalDirectory == "") {
@@ -83,15 +91,15 @@ function processOpenImage(fileName) {
 
   endplateIntermediateFilename = makeTiffFilename("muscle_intermediate_endplate_", originalTitle);
   endplateIntermediateFilepath = destination + endplateIntermediateFilename;
-  
-  // In case images are taken as hyperstacks, a Maximum Intensity Projection is created
-  if (is ("hyperstack")) {
+
+  getDimensions(width, height, numberOfChannels, slices, frames);
+  if (slices > 1) {
     run("Z Project...", "projection=[Max Intensity]");
     MAXtitle = getTitle();
     safeSelectWindow(originalTitle);
     close();
     safeSelectWindow(MAXtitle);
-    originalTitle = getTitle();
+    originalTitle = MAXtitle;
   }
 
   sourceCopyTitle = "__aNMJ_source_" + getImageID();
@@ -101,16 +109,13 @@ function processOpenImage(fileName) {
   outputFilename = originalDirectory + "raw_data_table.csv";
 
   printIfEnabled(getTitle());
-
-
   run("Clear Results");
-
   run("Paintbrush Tool Options...", "brush=100");
 
   getDimensions(imageWidth, imageHeight, numberOfChannels, slices, frames);
   imageDimensionsPixels = imageWidth + " x " + imageHeight;
   printIfEnabled("Image dimensions (pixels): " + imageDimensionsPixels);
-  
+
   getPixelSize(sizeUnit, pixelSizeX, pixelSizeY);
   if (pixelSizeX != pixelSizeY) {
     safeWaitForUser("WARNING: The image has a different scale on the X and Y axes. The results may not be accurate!");
@@ -121,7 +126,7 @@ function processOpenImage(fileName) {
   printIfEnabled("Image dimensions (metric): " + imageDimensionsMetric);
 
   Dialog.create("Welcome");
-  Dialog.addMessage("Welcome to 'aNMJ-morph' macro. \nSelect channel 1 that is currently displayed (either muscle endplate or nerve terminal). \nSelect channel 2 (either muscle endplate or nerve terminal). \n-\nPress OK.");
+  Dialog.addMessage("Welcome to 'aNMJ-morph' macro. \nSelect channel 1 that is currently displayed. \nSelect channel 2. \n-\nPress OK.");
   for (i = 1; i <= numberOfChannels; i++) {
     Dialog.addChoice("Channel " + i, newArray("Ignore", "Muscle endplate", "Nerve terminal"));
   }
@@ -150,29 +155,29 @@ function processOpenImage(fileName) {
   if (nerveTerminalChannel == -1) {
     exit("Error: No nerve terminal channel was selected");
   }
+  
   run("Arrange Channels...", "new=" + muscleEndplateChannel + '' + nerveTerminalChannel);
+  
+  safeSelectWindow(originalTitle);
   Stack.setChannel(1);
-
   run("Split Channels");
   run("Threshold...");
-  
-  // Create a second image in memory as a template for thresholding
+
   safeSelectWindow(sourceCopyTitle);
   templateTitle = "__aNMJ_template_" + getImageID();
   run("Duplicate...", "title=[" + templateTitle + "] duplicate");
   safeSelectWindow(templateTitle);
-  run("Arrange Channels...", "new=" + muscleEndplateChannel + '' + nerveTerminalChannel);
   Stack.setChannel(1);
   run("Split Channels");
+  templateFileName = templateTitle;
   
   setTool(19);
   setForegroundColor(0, 0, 0); 
   
-  // Adjust position of windows
   safeSelectWindow("C2-" + originalTitle);
   getLocationAndSize(x, y, width, height);
   setLocation(50, 50);
-  safeSelectWindow("C2-" + templateTitle);
+  safeSelectWindow("C2-" + templateFileName);
   getLocationAndSize(x2, y2, width2, height2);
   setLocation(100 + width, 50);
   
@@ -186,22 +191,19 @@ function processOpenImage(fileName) {
   run("Despeckle");
   saveAs("Tiff", axonFilepath);
 
-  // Close template of nerve terminal after thresholding
-  safeSelectWindow("C2-" + templateTitle);
+  safeSelectWindow("C2-" + templateFileName);
   close();
     
   safeSelectWindow("Threshold");
   run("Close");
   
-  
   safeSelectWindow("C1-" + originalTitle);
   run("Threshold...");
   
-  // Adjust position of windows
   safeSelectWindow("C1-" + originalTitle);
   getLocationAndSize(x, y, width, height);
   setLocation(50, 50);
-  safeSelectWindow("C1-" + templateTitle);
+  safeSelectWindow("C1-" + templateFileName);
   getLocationAndSize(x2, y2, width2, height2);
   setLocation(100+width, 50);
   safeSelectWindow("C1-" + originalTitle);
@@ -219,9 +221,13 @@ function processOpenImage(fileName) {
   safeSelectWindow("C1-" + originalTitle);
   saveAs("Tiff", endplateFilepath);
   
-  // Close Template of Endplate after thresholding
-  safeSelectWindow("C1-" + templateTitle);
+  safeSelectWindow("C1-" + templateFileName);
   close();
+
+  if (!printIntermediateResults && isOpen('Log')) {
+    safeSelectWindow('Log');
+    run('Close');
+  }
   
   setTool(4);
   safeSelectWindow(axonFilename);
@@ -233,7 +239,6 @@ function processOpenImage(fileName) {
     resultsArray = Array.concat(resultsArray, getResult("Length", i));
   };
   Array.getStatistics(resultsArray,min,max,avg,stdev);
-  printIfEnabled("Axon diameter: " + avg);
   axonDiameter = avg;
 
   if (isOpen("Results")) {
@@ -249,20 +254,13 @@ function processOpenImage(fileName) {
   run("Create Selection");
   run("Measure");
   nerveTerminalArea = getResult("Area");
-  printIfEnabled("Nerve terminal area: " + nerveTerminalArea);
   nerveTerminalPerimeter = getResult("Perim.");
-  printIfEnabled("Nerve terminal perimeter: " + nerveTerminalPerimeter);
-
 
   run("Make Binary", "thresholded remaining black");
   run("Convert to Mask");
   run("Skeletonize");
   run("BinaryConnectivity ", "white");
   getHistogram(values,counts, 256);
-  printIfEnabled("0: " + counts[0]);
-  printIfEnabled("2: " + counts[2]);
-  printIfEnabled("4: " + counts[4]);
-  printIfEnabled("5: " + counts[5]);
   counts0 = counts[0];
   counts2 = counts[2];
   counts4 = counts[4];
@@ -274,26 +272,19 @@ function processOpenImage(fileName) {
   run("Create Selection");
   run("Measure");
   achrArea = getResult("Area");
-  printIfEnabled("AChR area: " + achrArea);
   achrPerimeter = getResult("Perim.");
-  printIfEnabled("AChR perimeter: " + achrPerimeter);
 
   run("Subtract Background...", "rolling=50 create");
   run("Make Binary", "thresholded remaining black");
-
-// Measure endplate diameter - Feret diameter  
+  
   run("Create Selection");
   run("Measure");
   endplateDiameter = getResult("Feret");
-  printIfEnabled("Endplate diameter: " + endplateDiameter);
   
-// Measure Endplate Perimeter
   run("Create Selection");
   run("Measure");
   endplateArea = getResult("Area");
-  printIfEnabled("Endplate area: " + endplateArea);
   endplatePerimeter = getResult("Perim.");
-  printIfEnabled("Endplate perimeter: " + endplatePerimeter);
 
   saveAs("Tiff", endplateIntermediateFilepath);
   safeSelectWindow(endplateIntermediateFilename);
@@ -311,7 +302,6 @@ function processOpenImage(fileName) {
   run("Measure");
 
   unoccupiedAchrArea = getResult("Area");
-  printIfEnabled("Unoccupied AChR Area: " + unoccupiedAchrArea);
   
   safeSelectWindow("Results");
   run("Close");
@@ -319,10 +309,12 @@ function processOpenImage(fileName) {
   run("Close");
   safeSelectWindow("AVG_Concatenated Stacks");
   run("Close");
+  
   safeSelectWindow(sourceCopyTitle);
   segmentCopyTitle = "__aNMJ_segment_" + getImageID();
   run("Duplicate...", "title=[" + segmentCopyTitle + "] duplicate");
   safeSelectWindow(segmentCopyTitle);
+  
   run("Arrange Channels...", "new=" + muscleEndplateChannel + '' + nerveTerminalChannel);
   Stack.setChannel(1);
   
@@ -341,6 +333,7 @@ function processOpenImage(fileName) {
 
   run("Fill Holes");
   open(endplateIntermediateFilepath);
+
   safeSelectWindow("C1-" + segmentCopyTitle + " Segmented");
   run("Concatenate...", "title=[Concatenated Stacks] open image1=[C1-" + segmentCopyTitle + " Segmented] image2=[" + endplateIntermediateFilename + "]");
 
@@ -350,10 +343,9 @@ function processOpenImage(fileName) {
   run("Analyze Particles...", "display summarize");
   IJ.renameResults("Summary", "Results");
   numberOfClusters = getResult("Count");
-  printIfEnabled("Number of clusters: " + numberOfClusters);
   safeSelectWindow("Results");
   run("Close");
-
+  
   if (isOpen(sourceCopyTitle)) {
     safeSelectWindow(sourceCopyTitle);
     run("Close");
@@ -418,7 +410,6 @@ function processOpenImage(fileName) {
   rowNumber = linesCount + 1;
 
   if (lastCharacter != "\n") {
-    // Append missing trailing newline
     fileContents += "\n";
   }
 
@@ -428,11 +419,11 @@ function processOpenImage(fileName) {
     formattedNumberOfClusters = '';
   }
 
-  output = '"' + imageDimensionsPixels + '"' + columnSeparator +  /* Pixel dimensions */
-           '"' + imageDimensionsMetric + '"' + columnSeparator + /* Metric dimensions */
-           originalTitle + columnSeparator + /* Ref number */
-           thresholdMethodNerveTerminal + "/" + thresholdMethodEndplate + columnSeparator + /* Threshold */
-           /* empty */ columnSeparator + /* Number of Axonal Inputs */
+  output = '"' + imageDimensionsPixels + '"' + columnSeparator + 
+           '"' + imageDimensionsMetric + '"' + columnSeparator + 
+           originalTitle + columnSeparator + 
+           thresholdMethodNerveTerminal + "/" + thresholdMethodEndplate + columnSeparator + 
+           /* empty */ columnSeparator + 
            formatNumber(axonDiameter) + columnSeparator +
            formatNumber(nerveTerminalPerimeter) + columnSeparator + 
            formatNumber(nerveTerminalArea) + columnSeparator + 
@@ -440,27 +431,27 @@ function processOpenImage(fileName) {
            formatNumber(counts2) + columnSeparator + 
            formatNumber(counts4) + columnSeparator + 
            formatNumber(counts5) + columnSeparator + 
-           '"=J' + rowNumber + '"' + columnSeparator +  /* Number of Terminal Branches */
-           '"=(K' + rowNumber + '+L' + rowNumber + ')*0' + decimalSeparator + '28"' + columnSeparator + /* Number of Branch Points */
-           formatNumber(totalLengthOfBranches) + columnSeparator + /* Total Length of Branches (um) */
-           '"=O' + rowNumber + '/J' + rowNumber + '"' + columnSeparator + /* Average Length of Branches (um) */
-           '"=LOG10(M' + rowNumber + '*N' + rowNumber + '*O' + rowNumber + ')"' + columnSeparator + /* "Complexity" */
+           '"=J' + rowNumber + '"' + columnSeparator + 
+           '"=(K' + rowNumber + '+L' + rowNumber + ')*0' + decimalSeparator + '28"' + columnSeparator + 
+           formatNumber(totalLengthOfBranches) + columnSeparator + 
+           '"=O' + rowNumber + '/J' + rowNumber + '"' + columnSeparator + 
+           '"=LOG10(M' + rowNumber + '*N' + rowNumber + '*O' + rowNumber + ')"' + columnSeparator + 
            formatNumber(achrPerimeter) + columnSeparator + 
            formatNumber(achrArea) + columnSeparator + 
            formatNumber(endplateDiameter) + columnSeparator + 
            formatNumber(endplatePerimeter) + columnSeparator + 
            formatNumber(endplateArea) + columnSeparator + 
-           '"=S' + rowNumber + '/V' + rowNumber + '*100"' + columnSeparator + /* "Compactness" (%) */
+           '"=S' + rowNumber + '/V' + rowNumber + '*100"' + columnSeparator + 
            formatNumber(unoccupiedAchrArea) + columnSeparator + 
-           '"=S' + rowNumber + '-X' + rowNumber + '"' + columnSeparator + /* "Area of Synaptic Contact" (um2) */
-           '"=(S' + rowNumber + '-X' + rowNumber + ')/S' + rowNumber + '*100"' + columnSeparator + /* "Overlap" (%) */
+           '"=S' + rowNumber + '-X' + rowNumber + '"' + columnSeparator + 
+           '"=(S' + rowNumber + '-X' + rowNumber + ')/S' + rowNumber + '*100"' + columnSeparator + 
            formattedNumberOfClusters + columnSeparator +
-           '"=IF(AA' + rowNumber + columnSeparator + 'S' + rowNumber + '/AA' + rowNumber + columnSeparator + '"""")"' + columnSeparator + /* Average Area of AChR Clusters (um2) */
-           '"=IF(AA' + rowNumber + columnSeparator + '1-1/AA' + rowNumber + columnSeparator + '"""")"'; /* "Fragmentation" */
+           '"=IF(AA' + rowNumber + columnSeparator + 'S' + rowNumber + '/AA' + rowNumber + columnSeparator + '"""")"' + columnSeparator + 
+           '"=IF(AA' + rowNumber + columnSeparator + '1-1/AA' + rowNumber + columnSeparator + '"""")"'; 
 
   File.saveString(fileContents + output, outputFilename);
 
-  safeWaitForUser("7/7 Congratulations- 'aNMJ-morph is now complete! \n-\nPress OK. \nImages will be closed down and measurements will be saved onto a raw_data_table document. \nThis table contains all 19 'aNMJ-morph' variables. \n-\nHint: Table of variables must be closed during each cycle of 'aNMJ-morph'. \nNotes: Number of axonal inputs and muscle fibre diameter are recorded separately. \nSee manuscript for details (https://royalsocietypublishing.org/doi/full/10.1098/rsob.160240).");
+  safeWaitForUser("7/7 Congratulations- 'aNMJ-morph is now complete! \n-\nPress OK. \nImages will be closed down and measurements will be saved onto a raw_data_table document.");
   safeSelectWindow("Concatenated Stacks");
   run("Close");
   safeSelectWindow("AVG_Concatenated Stacks");
@@ -476,7 +467,7 @@ function batchProcess(directory) {
                 batchProcess(fileName);
             } 
             else {
-                open(fileName);
+                run("Bio-Formats Importer", "open=[" + fileName + "] autoscale color_mode=Default view=Hyperstack stack_order=XYCZT");
                 processOpenImage(fileName);
             }
         }
