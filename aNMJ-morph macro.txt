@@ -40,8 +40,7 @@ function makeTiffFilename(prefix, title) {
   return prefix + title + ".tif";
 }
 
-function isSupportedImageFile(fileName) {
-  lowerName = toLowerCase(fileName);
+function hasSupportedImageExtension(lowerName) {
   return endsWith(lowerName, ".tif") ||
          endsWith(lowerName, ".tiff") ||
          endsWith(lowerName, ".lsm") ||
@@ -52,6 +51,17 @@ function isSupportedImageFile(fileName) {
          endsWith(lowerName, ".jpg") ||
          endsWith(lowerName, ".jpeg") ||
          endsWith(lowerName, ".bmp");
+}
+
+function openImageFile(fileName) {
+  lowerName = toLowerCase(fileName);
+  if (endsWith(lowerName, ".tif") || endsWith(lowerName, ".tiff")) {
+    open(fileName);
+  } else if (hasSupportedImageExtension(lowerName)) {
+    run("Bio-Formats Importer", "open=[" + fileName + "] autoscale color_mode=Default view=Hyperstack stack_order=XYCZT");
+  } else {
+    exit("Error: Unsupported image format: " + fileName);
+  }
 }
 
 // Install Paintbrush Tool Options & other StartupMacros
@@ -87,8 +97,19 @@ function normalizeChannels() {
 
 list = getList("image.titles");
 if (list.length == 0) {
-  directory = getDirectory("Select directory with images to process");
-  batchProcess(directory);
+  Dialog.create("aNMJ-morph+");
+  Dialog.addChoice("Analyze", newArray("Single image", "Batch folder"));
+  Dialog.show();
+  inputMode = Dialog.getChoice();
+
+  if (inputMode == "Single image") {
+    fileName = File.openDialog("Select image to analyze");
+    openImageFile(fileName);
+    processOpenImage(fileName);
+  } else {
+    directory = getDirectory("Select directory with images to process");
+    batchProcess(directory);
+  }
 } else {
   safeSelectWindow(list[0]);
   processOpenImage(list[0]);
@@ -97,7 +118,11 @@ if (list.length == 0) {
 function processOpenImage(fileName) {
   normalizeChannels();
 
-  originalTitle = getTitle();
+  originalTitle = File.getName(getTitle());
+  if (getTitle() != originalTitle) {
+    rename(originalTitle);
+    originalTitle = getTitle();
+  }
   originalDirectory = getDirectory("image");
 
   if (originalDirectory == "") {
@@ -113,13 +138,15 @@ function processOpenImage(fileName) {
   destination = originalDirectory + "cleaned_images" + File.separator;
   File.makeDirectory(destination);
 
-  axonFilename = makeTiffFilename("axon_terminal", originalTitle);
+  inputTitle = File.getName(originalTitle);
+
+  axonFilename = makeTiffFilename("axon_terminal", inputTitle);
   axonFilepath = destination + axonFilename;
 
-  endplateFilename = makeTiffFilename("muscle_endplate", originalTitle);
+  endplateFilename = makeTiffFilename("muscle_endplate", inputTitle);
   endplateFilepath = destination + endplateFilename;
 
-  endplateIntermediateFilename = makeTiffFilename("muscle_intermediate_endplate", originalTitle);
+  endplateIntermediateFilename = makeTiffFilename("muscle_intermediate_endplate", inputTitle);
   endplateIntermediateFilepath = destination + endplateIntermediateFilename;
 
   getDimensions(width, height, numberOfChannels, slices, frames);
@@ -329,7 +356,9 @@ function processOpenImage(fileName) {
   run("Close");
 
   open(axonFilepath);
+  rename(axonFilename);
   open(endplateFilepath);
+  rename(endplateFilename);
 
   run("Invert");
   run("Concatenate...", "title=[Concatenated Stacks] image1=[" + axonFilename + "] image2=[" + endplateFilename + "]");
@@ -373,6 +402,7 @@ function processOpenImage(fileName) {
 
   run("Fill Holes");
   open(endplateIntermediateFilepath);
+  rename(endplateIntermediateFilename);
 
   safeSelectWindow("C1-" + segmentCopyTitle + " Segmented");
   run("Concatenate...", "title=[Concatenated Stacks] open image1=[C1-" + segmentCopyTitle + " Segmented] image2=[" + endplateIntermediateFilename + "]");
@@ -392,8 +422,19 @@ function processOpenImage(fileName) {
     run("Close");
   }
 
+  fileLength = 0;
   if (File.exists(outputFilename)) {
-    fileContents = File.openAsString(outputFilename);
+    fileLength = File.length(outputFilename);
+  }
+
+  if (fileLength > 0) {
+    fileContents = File.openAsRawString(outputFilename, fileLength);
+    lastCharacter = substring(fileContents, lengthOf(fileContents) - 1);
+    lines = split(fileContents, "\n");
+    rowNumber = lines.length + 1;
+    if (lastCharacter != "\n") {
+      File.append("", outputFilename);
+    }
   } else {
     line1 = "IMAGE DETAILS (frame size)" + columnSeparator +
             columnSeparator +
@@ -442,16 +483,8 @@ function processOpenImage(fileName) {
             '"Number of AChR Clusters"' + columnSeparator +
             '"Average Area of AChR Clusters (um2)"' + columnSeparator +
             '"""Fragmentation"""';
-    fileContents = line1 + "\n" + line2;
-  }
-
-  lastCharacter = substring(fileContents, lengthOf(fileContents) - 1);
-  lines = split(fileContents, "\n");
-  linesCount = lines.length;
-  rowNumber = linesCount + 1;
-
-  if (lastCharacter != "\n") {
-    fileContents += "\n";
+    File.saveString(line1 + "\n" + line2 + "\n", outputFilename);
+    rowNumber = 3;
   }
 
   if (imageAlright) {
@@ -462,7 +495,7 @@ function processOpenImage(fileName) {
 
   output = '"' + imageDimensionsPixels + '"' + columnSeparator +
            '"' + imageDimensionsMetric + '"' + columnSeparator +
-           originalTitle + columnSeparator +
+           inputTitle + columnSeparator +
            thresholdMethodNerveTerminal + "/" + thresholdMethodEndplate + columnSeparator +
            /* empty */ columnSeparator +
            formatNumber(axonDiameter) + columnSeparator +
@@ -490,7 +523,7 @@ function processOpenImage(fileName) {
            '"=IF(AA' + rowNumber + columnSeparator + 'S' + rowNumber + '/AA' + rowNumber + columnSeparator + '"""")"' + columnSeparator +
            '"=IF(AA' + rowNumber + columnSeparator + '1-1/AA' + rowNumber + columnSeparator + '"""")"';
 
-  File.saveString(fileContents + output, outputFilename);
+  File.append(output, outputFilename);
 
   safeWaitForUser("7/7 Congratulations- 'aNMJ-morph is now complete! \n-\nPress OK. \nImages will be closed down and measurements will be saved onto a raw_data_table document.");
   safeSelectWindow("Concatenated Stacks");
@@ -509,14 +542,12 @@ function batchProcess(directory) {
       if (indexOf(lowerDirectory, "cleaned_images") == -1) {
         batchProcess(fileName);
       }
-    } else if (isSupportedImageFile(fileName)) {
+    } else {
       lowerName = toLowerCase(fileName);
-      if (endsWith(lowerName, ".tif") || endsWith(lowerName, ".tiff")) {
-        open(fileName);
-      } else {
-        run("Bio-Formats Importer", "open=[" + fileName + "] autoscale color_mode=Default view=Hyperstack stack_order=XYCZT");
+      if (hasSupportedImageExtension(lowerName)) {
+        openImageFile(fileName);
+        processOpenImage(fileName);
       }
-      processOpenImage(fileName);
     }
   }
 }
