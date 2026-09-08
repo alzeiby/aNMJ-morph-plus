@@ -92,10 +92,23 @@ def main() -> None:
 
     # Batch and CSV I/O should avoid unnecessary parsing and rewriting work.
     require("hasSupportedImageExtension(lowerName)" in MACRO, "Batch extension checks are not using the normalized filename")
+    require("function openImageFile(fileName)" in MACRO, "Image opening is not centralized")
     require(
         'if (endsWith(lowerName, ".tif") || endsWith(lowerName, ".tiff"))' in MACRO,
         "TIFF batch inputs are not using the established native ImageJ open path",
     )
+    require(MACRO.count('openImageFile(fileName);') >= 2, "Batch/single-image paths are not both routed through the common image opener")
+    require('Dialog.addChoice("Analyze", newArray("Single image", "Batch folder"));' in MACRO, "Single-image file selection mode is missing")
+    require('fileName = File.openDialog("Select image to analyze");' in MACRO, "Single-image file picker is missing")
+    require('originalTitle = File.getName(getTitle());' in MACRO, "Bio-Formats titles are not normalized to a basename")
+    require('rename(originalTitle);' in MACRO, "Normalized Bio-Formats basename is not applied to the image window")
+    require('inputTitle = File.getName(originalTitle);' in MACRO, "Stable input basename is not preserved for output naming")
+    require('inputTitle + columnSeparator +' in MACRO, "CSV image name is not based on the stable input basename")
+    require('makeTiffFilename("axon_terminal", inputTitle)' in MACRO, "Axon output filename is not based on the stable input basename")
+    require('makeTiffFilename("muscle_endplate", inputTitle)' in MACRO, "Endplate output filename is not based on the stable input basename")
+    require('rename(axonFilename);' in MACRO, "Reopened axon TIFF is not assigned its stable window title")
+    require('rename(endplateFilename);' in MACRO, "Reopened endplate TIFF is not assigned its stable window title")
+    require('rename(endplateIntermediateFilename);' in MACRO, "Reopened intermediate TIFF is not assigned its stable window title")
     require("canOpenDirectly" not in MACRO, "Non-TIFF native-open shortcut should not bypass Bio-Formats")
     require('File.append(output, outputFilename);' in MACRO, "CSV rows are not appended incrementally")
     require("File.saveString(fileContents + output, outputFilename);" not in MACRO, "CSV output still rewrites the entire existing file")
@@ -158,8 +171,8 @@ def main() -> None:
         require(marker in MACRO, f"Diagnostic output missing: {marker}")
 
     # Preserve historical cleaned-image filename prefixes.
-    require('makeTiffFilename("axon_terminal", originalTitle)' in MACRO, "Axon output filename prefix changed")
-    require('makeTiffFilename("muscle_endplate", originalTitle)' in MACRO, "Endplate output filename prefix changed")
+    require('makeTiffFilename("axon_terminal", inputTitle)' in MACRO, "Axon output filename prefix changed")
+    require('makeTiffFilename("muscle_endplate", inputTitle)' in MACRO, "Endplate output filename prefix changed")
 
     reference_images = sorted((ROOT / "Reference Images").glob("*.lsm"))
     require(len(reference_images) == 20, f"Expected 20 reference LSM images, found {len(reference_images)}")
