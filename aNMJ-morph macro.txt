@@ -17,8 +17,12 @@ function printIfEnabled(message) {
 }
 
 function safeSelectWindow(windowTitle) {
+  if (nImages > 0 && getInfo("window.title") == windowTitle && getTitle() == windowTitle) {
+    return;
+  }
   wait(100);
   selectWindow(windowTitle);
+  wait(100);
 }
 
 function safeWaitForUser(message) {
@@ -128,9 +132,11 @@ function processOpenImage(fileName) {
     originalTitle = MAXtitle;
   }
 
-  sourceCopyTitle = "__aNMJ_source_" + getImageID();
+  originalImageId = getImageID();
+  sourceCopyTitle = "__aNMJ_source_" + originalImageId;
   run("Duplicate...", "title=[" + sourceCopyTitle + "] duplicate");
-  safeSelectWindow(originalTitle);
+  sourceCopyId = getImageID();
+  selectImage(originalImageId);
 
   outputFilename = originalDirectory + "raw_data_table.csv";
 
@@ -139,7 +145,7 @@ function processOpenImage(fileName) {
   run("Paintbrush Tool Options...", "brush=100");
 
   getDimensions(imageWidth, imageHeight, numberOfChannels, slices, frames);
-  imageDimensionsPixels = imageWidth + " x " + imageHeight;
+  imageDimensionsPixels = "" + imageWidth + " x " + imageHeight;
   printIfEnabled("Image dimensions (pixels): " + imageDimensionsPixels);
 
   getPixelSize(sizeUnit, pixelSizeX, pixelSizeY);
@@ -148,7 +154,7 @@ function processOpenImage(fileName) {
   }
   metricWidth = pixelSizeX * imageWidth;
   metricHeight = pixelSizeY * imageHeight;
-  imageDimensionsMetric = formatNumber(metricWidth) + " x " + formatNumber(metricHeight) + sizeUnit;
+  imageDimensionsMetric = "" + formatNumber(metricWidth) + " x " + formatNumber(metricHeight) + sizeUnit;
   printIfEnabled("Image dimensions (metric): " + imageDimensionsMetric);
 
   Dialog.create("Welcome");
@@ -182,18 +188,20 @@ function processOpenImage(fileName) {
     exit("Error: No nerve terminal channel was selected");
   }
 
+  selectImage(originalImageId);
   run("Arrange Channels...", "new=" + muscleEndplateChannel + '' + nerveTerminalChannel);
-
-  safeSelectWindow(originalTitle);
+  selectImage(originalImageId);
   Stack.setChannel(1);
   run("Split Channels");
   run("Threshold...");
 
-  safeSelectWindow(sourceCopyTitle);
-  templateTitle = "__aNMJ_template_" + getImageID();
+  selectImage(sourceCopyId);
+  templateTitle = "__aNMJ_template_" + sourceCopyId;
   run("Duplicate...", "title=[" + templateTitle + "] duplicate");
-  safeSelectWindow(templateTitle);
+  templateImageId = getImageID();
+  selectImage(templateImageId);
   run("Arrange Channels...", "new=" + muscleEndplateChannel + '' + nerveTerminalChannel);
+  selectImage(templateImageId);
   Stack.setChannel(1);
   run("Split Channels");
   templateFileName = templateTitle;
@@ -205,7 +213,6 @@ function processOpenImage(fileName) {
   getLocationAndSize(x, y, width, height);
   setLocation(50, 50);
   safeSelectWindow("C2-" + templateFileName);
-  getLocationAndSize(x2, y2, width2, height2);
   setLocation(100 + width, 50);
 
   safeSelectWindow("C2-" + originalTitle);
@@ -231,7 +238,6 @@ function processOpenImage(fileName) {
   getLocationAndSize(x, y, width, height);
   setLocation(50, 50);
   safeSelectWindow("C1-" + templateFileName);
-  getLocationAndSize(x2, y2, width2, height2);
   setLocation(100+width, 50);
   safeSelectWindow("C1-" + originalTitle);
 
@@ -256,10 +262,11 @@ function processOpenImage(fileName) {
   run("Set Measurements...", "  redirect=None decimal=8");
   safeWaitForUser("Screen 4/7 Measuring Axon Width. \nLine tool is already selected. \nMeasure by drawing line and pressing 'M' on keyboard. \nThree measurements are required: \n   1) Maximum axon width \n   2) Minimum axon width \n   3) Axon hillock width \n-\n\Hint: Axon hillock is where axon meets nerve terminals. \nHint: Zoom in for accurate measurement of thin axons. \nPress 'ctrl' and '+' or '-' to zoom in or out. \n-\nNotes: Axon width will be recorded automatically using the average of the three measurements. \nEnsure that extra measurements are deleted from 'results tab' before pressing OK. \nIf no axon is present, press OK. \n-\nPress OK.");
 
-  resultsArray = newArray();
-  for (i=0; i<nResults();i++) {;
-    resultsArray = Array.concat(resultsArray, getResult("Length", i));
-  };
+  resultsCount = nResults();
+  resultsArray = newArray(resultsCount);
+  for (i=0; i<resultsCount; i++) {
+    resultsArray[i] = getResult("Length", i);
+  }
   Array.getStatistics(resultsArray,min,max,avg,stdev);
   axonDiameter = avg;
   printIfEnabled("Axon diameter: " + axonDiameter);
@@ -312,9 +319,6 @@ function processOpenImage(fileName) {
   run("Measure");
   endplateDiameter = getResult("Feret");
   printIfEnabled("Endplate diameter: " + endplateDiameter);
-
-  run("Create Selection");
-  run("Measure");
   endplateArea = getResult("Area");
   printIfEnabled("Endplate area: " + endplateArea);
   endplatePerimeter = getResult("Perim.");
@@ -345,12 +349,13 @@ function processOpenImage(fileName) {
   safeSelectWindow("AVG_Concatenated Stacks");
   run("Close");
 
-  safeSelectWindow(sourceCopyTitle);
-  segmentCopyTitle = "__aNMJ_segment_" + getImageID();
+  selectImage(sourceCopyId);
+  segmentCopyTitle = "__aNMJ_segment_" + sourceCopyId;
   run("Duplicate...", "title=[" + segmentCopyTitle + "] duplicate");
-  safeSelectWindow(segmentCopyTitle);
-
+  segmentImageId = getImageID();
+  selectImage(segmentImageId);
   run("Arrange Channels...", "new=" + muscleEndplateChannel + '' + nerveTerminalChannel);
+  selectImage(segmentImageId);
   Stack.setChannel(1);
 
   run("Split Channels");
