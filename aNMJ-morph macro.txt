@@ -91,9 +91,6 @@ function processOpenImage(fileName) {
 
   run("Paintbrush Tool Options...", "brush=100");
 
-  // Keep width and height separately so rectangular images are handled correctly.
-  // These variables are intentionally distinct from the window width/height values
-  // used later by getLocationAndSize().
   getDimensions(imageWidth, imageHeight, numberOfChannels, slices, frames);
   imageDimensionsPixels = imageWidth + " x " + imageHeight;
   printIfEnabled("Image dimensions (pixels): " + imageDimensionsPixels);
@@ -259,8 +256,6 @@ function processOpenImage(fileName) {
   counts2 = counts[2];
   counts4 = counts[4];
   counts5 = counts[5];
-  // Generalized from the original square-image spreadsheet formula:
-  // foreground skeleton pixels * calibrated pixel size.
   totalLengthOfBranches = (imageWidth * imageHeight - counts0) * pixelSizeX;
 
   safeSelectWindow(axonFilename);
