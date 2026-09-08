@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate repository
+        run: python tests/repository_checks.py
+
+      - name: Build release archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME}"
+          package="aNMJ-morph-plus-${version}"
+          mkdir -p "dist/${package}"
+          cp "aNMJ-morph macro.txt" README.md license.txt license_text "dist/${package}/"
+          cp "Reference Spreadsheet.xlsx" "dist/${package}/"
+          cp -R "Reference Images" "dist/${package}/Reference Images"
+          cd dist
+          zip -r "${package}.zip" "${package}"
+          sha256sum "${package}.zip" > "${package}.zip.sha256"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME}"
+          package="aNMJ-morph-plus-${version}"
+          gh release create "${version}" \
+            "dist/${package}.zip" \
+            "dist/${package}.zip.sha256" \
+            --generate-notes \
+            --title "${version}"
