@@ -9,14 +9,12 @@ package_dir="${dist_dir}/${package}"
 rm -rf "${package_dir}"
 mkdir -p "${package_dir}"
 
-cp "aNMJ-morph macro.txt" license.txt license_text "Reference Spreadsheet.xlsx" "${package_dir}/"
+cp "aNMJ-morph macro.txt" LICENSE "Reference Spreadsheet.xlsx" "${package_dir}/"
 cp -R "Reference Images" "${package_dir}/Reference Images"
 
-for optional_file in README.md LICENSE; do
-  if [[ -f "${optional_file}" ]]; then
-    cp "${optional_file}" "${package_dir}/"
-  fi
-done
+if [[ -f README.md ]]; then
+  cp README.md "${package_dir}/"
+fi
 
 mkdir -p "${dist_dir}"
 (
