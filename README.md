@@ -32,8 +32,6 @@ For square images this is algebraically equivalent to the original calculation, 
 
 **Important:** the macro still warns when X and Y pixel calibration differ. Rectangular images with isotropic pixels are supported; anisotropic pixel calibration remains a separate limitation that should be validated before quantitative use.
 
-See [`VALIDATION.md`](VALIDATION.md) for the regression argument and a suggested validation protocol.
-
 ## Requirements
 
 - [Fiji](https://fiji.sc/) / ImageJ
@@ -87,8 +85,6 @@ This repository is derived from the aNMJ-morph macro and supporting dataset crea
 3. **Minty G, Hoppen A, Boehm I, et al.** aNMJ-morph macro [dataset]. Edinburgh DataShare, University of Edinburgh. 2019. https://doi.org/10.7488/ds/2625
 4. **Landini G.** Advanced shape analysis with ImageJ. *Proceedings of the Second ImageJ User and Developer Conference*. 2008;116-121. Binary Connectivity is distributed with Landini's Morphological Operators for ImageJ: https://blog.bham.ac.uk/intellimic/g-landini-software/
 5. **Schindelin J, Arganda-Carreras I, Frise E, et al.** Fiji: an open-source platform for biological-image analysis. *Nature Methods*. 2012;9:676-682. https://doi.org/10.1038/nmeth.2019
-
-See [`CITATION.md`](CITATION.md) for copy-ready citations.
 
 ## License and provenance
 
