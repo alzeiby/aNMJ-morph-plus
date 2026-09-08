@@ -119,6 +119,14 @@ def main() -> None:
     license_text = (ROOT / "LICENSE").read_text(encoding="utf-8", errors="replace")
     require("Creative Commons Attribution 4.0 International" in license_text, "CC BY 4.0 license notice is missing")
     require("https://doi.org/10.7488/ds/2625" in license_text, "Original dataset attribution is missing from LICENSE")
+    require("Abdullah Alzeiby" in license_text, "aNMJ-morph+ author attribution is missing from LICENSE")
+
+    citation_path = ROOT / "CITATION.cff"
+    require(citation_path.exists(), "CITATION.cff is missing")
+    citation_text = citation_path.read_text(encoding="utf-8", errors="replace")
+    require('family-names: "Alzeiby"' in citation_text, "CITATION.cff is missing the aNMJ-morph+ author")
+    require('given-names: "Abdullah"' in citation_text, "CITATION.cff is missing the aNMJ-morph+ author")
+    require("https://github.com/alzeiby/aNMJ-morph-plus" in citation_text, "CITATION.cff repository URL is missing")
 
     print("Repository checks passed")
 
