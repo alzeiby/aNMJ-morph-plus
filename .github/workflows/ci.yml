@@ -31,6 +31,11 @@ jobs:
       - name: Run repository checks
         run: python tests/repository_checks.py
 
+      - name: Check runtime harness generation
+        run: |
+          python -m py_compile tests/runtime/build_harnesses.py tests/runtime/validate_outputs.py
+          python tests/runtime/build_harnesses.py --check
+
       - name: Check whitespace errors
         run: git diff --check HEAD~1 HEAD
 
