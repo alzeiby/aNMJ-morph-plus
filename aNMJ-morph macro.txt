@@ -91,20 +91,21 @@ function processOpenImage(fileName) {
 
   run("Paintbrush Tool Options...", "brush=100");
 
-  if (getHeight() != getWidth()) {
-    safeWaitForUser("WARNING: The image you are processing is not square. The results may not be accurate!");
-  }
-  numberPixels = getHeight();
-  printIfEnabled("Number of pixels: " + numberPixels);
+  // Keep width and height separately so rectangular images are handled correctly.
+  // These variables are intentionally distinct from the window width/height values
+  // used later by getLocationAndSize().
+  getDimensions(imageWidth, imageHeight, numberOfChannels, slices, frames);
+  imageDimensionsPixels = imageWidth + " x " + imageHeight;
+  printIfEnabled("Image dimensions (pixels): " + imageDimensionsPixels);
   
   getPixelSize(sizeUnit, pixelSizeX, pixelSizeY);
   if (pixelSizeX != pixelSizeY) {
     safeWaitForUser("WARNING: The image has a different scale on the X and Y axes. The results may not be accurate!");
   }
-  size = pixelSizeX * getWidth();
-  printIfEnabled("Image size: " + size + sizeUnit);
-
-  getDimensions(width, height, numberOfChannels, slices, frames);
+  metricWidth = pixelSizeX * imageWidth;
+  metricHeight = pixelSizeY * imageHeight;
+  imageDimensionsMetric = formatNumber(metricWidth) + " x " + formatNumber(metricHeight) + sizeUnit;
+  printIfEnabled("Image dimensions (metric): " + imageDimensionsMetric);
 
   Dialog.create("Welcome");
   Dialog.addMessage("Welcome to 'aNMJ-morph' macro. \nSelect channel 1 that is currently displayed (either muscle endplate or nerve terminal). \nSelect channel 2 (either muscle endplate or nerve terminal). \n-\nPress OK.");
@@ -258,6 +259,9 @@ function processOpenImage(fileName) {
   counts2 = counts[2];
   counts4 = counts[4];
   counts5 = counts[5];
+  // Generalized from the original square-image spreadsheet formula:
+  // foreground skeleton pixels * calibrated pixel size.
+  totalLengthOfBranches = (imageWidth * imageHeight - counts0) * pixelSizeX;
 
   safeSelectWindow(axonFilename);
   run("Close");
@@ -411,8 +415,8 @@ function processOpenImage(fileName) {
     formattedNumberOfClusters = '';
   }
 
-  output = "" + formatNumber(numberPixels) + columnSeparator +  /* Number of Pixels */
-           formatNumber(size) + columnSeparator + /* Metric */
+  output = '"' + imageDimensionsPixels + '"' + columnSeparator +  /* Pixel dimensions */
+           '"' + imageDimensionsMetric + '"' + columnSeparator + /* Metric dimensions */
            originalTitle + columnSeparator + /* Ref number */
            thresholdMethodNerveTerminal + "/" + thresholdMethodEndplate + columnSeparator + /* Threshold */
            /* empty */ columnSeparator + /* Number of Axonal Inputs */
@@ -425,7 +429,7 @@ function processOpenImage(fileName) {
            formatNumber(counts5) + columnSeparator + 
            '"=J' + rowNumber + '"' + columnSeparator +  /* Number of Terminal Branches */
            '"=(K' + rowNumber + '+L' + rowNumber + ')*0' + decimalSeparator + '28"' + columnSeparator + /* Number of Branch Points */
-           '"=(A' + rowNumber + '*A' + rowNumber + '-I' + rowNumber + ')*B' + rowNumber + '/A' + rowNumber + '"' + columnSeparator + /* Total Length of Branches (um) */
+           formatNumber(totalLengthOfBranches) + columnSeparator + /* Total Length of Branches (um) */
            '"=O' + rowNumber + '/J' + rowNumber + '"' + columnSeparator + /* Average Length of Branches (um) */
            '"=LOG10(M' + rowNumber + '*N' + rowNumber + '*O' + rowNumber + ')"' + columnSeparator + /* "Complexity" */
            formatNumber(achrPerimeter) + columnSeparator + 
