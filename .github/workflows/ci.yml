@@ -42,4 +42,5 @@ jobs:
         run: |
           test -s dist/aNMJ-morph-plus-ci-smoke.zip
           test -s dist/aNMJ-morph-plus-ci-smoke.zip.sha256
-          sha256sum -c dist/aNMJ-morph-plus-ci-smoke.zip.sha256
+          cd dist
+          sha256sum -c aNMJ-morph-plus-ci-smoke.zip.sha256
