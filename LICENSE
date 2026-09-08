@@ -1,11 +1,34 @@
-aNMJ-morph+ licensing notice
+aNMJ-morph+ License and Attribution
 
-The original aNMJ-morph material distributed through Edinburgh DataShare is licensed under the Creative Commons Attribution 4.0 International license (CC BY 4.0).
+This repository is a modified distribution of aNMJ-morph and its supporting material.
 
-Fork-authored modifications in this repository are also made available under CC BY 4.0 unless otherwise noted.
+Original material
+-----------------
+The original aNMJ-morph macro and supporting dataset were created by Minty, Hoppen, Boehm, and colleagues at the University of Edinburgh and distributed through Edinburgh DataShare:
 
-Full license text: ./license_text
-License URL: https://creativecommons.org/licenses/by/4.0/legalcode
-Original dataset: https://doi.org/10.7488/ds/2625
+https://doi.org/10.7488/ds/2625
 
-When sharing this material, retain attribution to the original creators, indicate that changes were made, provide a link to the applicable license, and preserve notices supplied with the licensed material.
+The original material is licensed under the Creative Commons Attribution 4.0 International license (CC BY 4.0).
+
+Fork modifications
+------------------
+Unless otherwise noted, modifications and additions made in aNMJ-morph+ are also made available under CC BY 4.0.
+
+Creative Commons Attribution 4.0 International
+----------------------------------------------
+License: https://creativecommons.org/licenses/by/4.0/
+Legal code: https://creativecommons.org/licenses/by/4.0/legalcode
+
+Under CC BY 4.0, you may share and adapt the licensed material for any purpose, including commercially, provided that you give appropriate credit, provide a link to the license, and indicate if changes were made. You may not apply legal terms or technological measures that legally restrict others from doing anything the license permits.
+
+When redistributing this repository or material derived from it:
+
+1. Credit the original aNMJ-morph creators.
+2. Cite or link the original Edinburgh DataShare dataset above.
+3. State that this repository is a modified version and indicate further changes you make.
+4. Include a link to the CC BY 4.0 license.
+5. Preserve attribution and licensing notices supplied with the licensed material.
+
+No endorsement by the original creators, the University of Edinburgh, or Creative Commons is implied.
+
+The licensed material is provided without warranties to the extent permitted by applicable law. See the CC BY 4.0 legal code linked above for the complete license terms, including the disclaimer of warranties and limitation of liability.
