@@ -92,11 +92,21 @@ def main() -> None:
 
     # Batch and CSV I/O should avoid unnecessary parsing and rewriting work.
     require("hasSupportedImageExtension(lowerName)" in MACRO, "Batch extension checks are not using the normalized filename")
-    require("canOpenDirectly(lowerName)" in MACRO, "Native image formats are not opened directly")
-    require('endsWith(lowerName, ".png")' in MACRO, "PNG direct-open support is missing")
+    require(
+        'if (endsWith(lowerName, ".tif") || endsWith(lowerName, ".tiff"))' in MACRO,
+        "TIFF batch inputs are not using the established native ImageJ open path",
+    )
+    require("canOpenDirectly" not in MACRO, "Non-TIFF native-open shortcut should not bypass Bio-Formats")
     require('File.append(output, outputFilename);' in MACRO, "CSV rows are not appended incrementally")
     require("File.saveString(fileContents + output, outputFilename);" not in MACRO, "CSV output still rewrites the entire existing file")
-    require("File.length(outputFilename) > 0" in MACRO, "Empty output files are not handled explicitly")
+    require("fileLength = File.length(outputFilename);" in MACRO, "Existing CSV length is not recorded")
+    require("if (fileLength > 0)" in MACRO, "Empty output files are not handled explicitly")
+    require('File.openAsRawString(outputFilename, fileLength)' in MACRO, "CSV newline detection is not using physical file contents")
+    require('File.openAsString(outputFilename)' not in MACRO, "Normalized text reads cannot detect a missing final newline")
+    require('File.append("\\n", outputFilename);' not in MACRO, "CSV separator append would insert a blank row")
+    require('File.append("", outputFilename);' in MACRO, "Legacy CSV rows without a newline are not terminated safely")
+    require('File.saveString(line1 + "\\n" + line2 + "\\n", outputFilename);' in MACRO, "Missing/empty CSV header initialization changed")
+    require("rowNumber = 3;" in MACRO, "First data row should remain spreadsheet row 3")
 
     # Multiple-open-image mode must explicitly select the image it passes to processOpenImage.
     require("safeSelectWindow(list[0]);" in MACRO, "The first listed image is not explicitly selected before analysis")

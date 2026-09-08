@@ -53,15 +53,6 @@ function hasSupportedImageExtension(lowerName) {
          endsWith(lowerName, ".bmp");
 }
 
-function canOpenDirectly(lowerName) {
-  return endsWith(lowerName, ".tif") ||
-         endsWith(lowerName, ".tiff") ||
-         endsWith(lowerName, ".png") ||
-         endsWith(lowerName, ".jpg") ||
-         endsWith(lowerName, ".jpeg") ||
-         endsWith(lowerName, ".bmp");
-}
-
 // Install Paintbrush Tool Options & other StartupMacros
 macrosDirectory = getDirectory("macros");
 run("Install...", "install="+macrosDirectory+File.separator+"StartupMacros.fiji.ijm");
@@ -400,13 +391,18 @@ function processOpenImage(fileName) {
     run("Close");
   }
 
-  if (File.exists(outputFilename) && File.length(outputFilename) > 0) {
-    fileContents = File.openAsString(outputFilename);
+  fileLength = 0;
+  if (File.exists(outputFilename)) {
+    fileLength = File.length(outputFilename);
+  }
+
+  if (fileLength > 0) {
+    fileContents = File.openAsRawString(outputFilename, fileLength);
     lastCharacter = substring(fileContents, lengthOf(fileContents) - 1);
     lines = split(fileContents, "\n");
     rowNumber = lines.length + 1;
     if (lastCharacter != "\n") {
-      File.append("\n", outputFilename);
+      File.append("", outputFilename);
     }
   } else {
     line1 = "IMAGE DETAILS (frame size)" + columnSeparator +
@@ -518,7 +514,7 @@ function batchProcess(directory) {
     } else {
       lowerName = toLowerCase(fileName);
       if (hasSupportedImageExtension(lowerName)) {
-        if (canOpenDirectly(lowerName)) {
+        if (endsWith(lowerName, ".tif") || endsWith(lowerName, ".tiff")) {
           open(fileName);
         } else {
           run("Bio-Formats Importer", "open=[" + fileName + "] autoscale color_mode=Default view=Hyperstack stack_order=XYCZT");
