@@ -40,14 +40,22 @@ function makeTiffFilename(prefix, title) {
   return prefix + title + ".tif";
 }
 
-function isSupportedImageFile(fileName) {
-  lowerName = toLowerCase(fileName);
+function hasSupportedImageExtension(lowerName) {
   return endsWith(lowerName, ".tif") ||
          endsWith(lowerName, ".tiff") ||
          endsWith(lowerName, ".lsm") ||
          endsWith(lowerName, ".nd2") ||
          endsWith(lowerName, ".czi") ||
          endsWith(lowerName, ".lif") ||
+         endsWith(lowerName, ".png") ||
+         endsWith(lowerName, ".jpg") ||
+         endsWith(lowerName, ".jpeg") ||
+         endsWith(lowerName, ".bmp");
+}
+
+function canOpenDirectly(lowerName) {
+  return endsWith(lowerName, ".tif") ||
+         endsWith(lowerName, ".tiff") ||
          endsWith(lowerName, ".png") ||
          endsWith(lowerName, ".jpg") ||
          endsWith(lowerName, ".jpeg") ||
@@ -392,8 +400,14 @@ function processOpenImage(fileName) {
     run("Close");
   }
 
-  if (File.exists(outputFilename)) {
+  if (File.exists(outputFilename) && File.length(outputFilename) > 0) {
     fileContents = File.openAsString(outputFilename);
+    lastCharacter = substring(fileContents, lengthOf(fileContents) - 1);
+    lines = split(fileContents, "\n");
+    rowNumber = lines.length + 1;
+    if (lastCharacter != "\n") {
+      File.append("\n", outputFilename);
+    }
   } else {
     line1 = "IMAGE DETAILS (frame size)" + columnSeparator +
             columnSeparator +
@@ -442,16 +456,8 @@ function processOpenImage(fileName) {
             '"Number of AChR Clusters"' + columnSeparator +
             '"Average Area of AChR Clusters (um2)"' + columnSeparator +
             '"""Fragmentation"""';
-    fileContents = line1 + "\n" + line2;
-  }
-
-  lastCharacter = substring(fileContents, lengthOf(fileContents) - 1);
-  lines = split(fileContents, "\n");
-  linesCount = lines.length;
-  rowNumber = linesCount + 1;
-
-  if (lastCharacter != "\n") {
-    fileContents += "\n";
+    File.saveString(line1 + "\n" + line2 + "\n", outputFilename);
+    rowNumber = 3;
   }
 
   if (imageAlright) {
@@ -490,7 +496,7 @@ function processOpenImage(fileName) {
            '"=IF(AA' + rowNumber + columnSeparator + 'S' + rowNumber + '/AA' + rowNumber + columnSeparator + '"""")"' + columnSeparator +
            '"=IF(AA' + rowNumber + columnSeparator + '1-1/AA' + rowNumber + columnSeparator + '"""")"';
 
-  File.saveString(fileContents + output, outputFilename);
+  File.append(output, outputFilename);
 
   safeWaitForUser("7/7 Congratulations- 'aNMJ-morph is now complete! \n-\nPress OK. \nImages will be closed down and measurements will be saved onto a raw_data_table document.");
   safeSelectWindow("Concatenated Stacks");
@@ -509,14 +515,16 @@ function batchProcess(directory) {
       if (indexOf(lowerDirectory, "cleaned_images") == -1) {
         batchProcess(fileName);
       }
-    } else if (isSupportedImageFile(fileName)) {
+    } else {
       lowerName = toLowerCase(fileName);
-      if (endsWith(lowerName, ".tif") || endsWith(lowerName, ".tiff")) {
-        open(fileName);
-      } else {
-        run("Bio-Formats Importer", "open=[" + fileName + "] autoscale color_mode=Default view=Hyperstack stack_order=XYCZT");
+      if (hasSupportedImageExtension(lowerName)) {
+        if (canOpenDirectly(lowerName)) {
+          open(fileName);
+        } else {
+          run("Bio-Formats Importer", "open=[" + fileName + "] autoscale color_mode=Default view=Hyperstack stack_order=XYCZT");
+        }
+        processOpenImage(fileName);
       }
-      processOpenImage(fileName);
     }
   }
 }
