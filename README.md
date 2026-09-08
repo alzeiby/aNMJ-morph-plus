@@ -92,7 +92,8 @@ For publication-grade use, validate the modified workflow on representative imag
 
 If you use **aNMJ-morph+**, cite this repository **in addition to** the original aNMJ-morph work. GitHub can generate citation formats from `CITATION.cff` using **Cite this repository**.
 
-**aNMJ-morph+ software**  
+**aNMJ-morph+ software**
+
 Abdullah Alzeiby. *aNMJ-morph+*. https://github.com/alzeiby/aNMJ-morph-plus
 
 Original method and supporting references:
