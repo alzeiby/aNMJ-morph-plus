@@ -1,6 +1,6 @@
 # aNMJ-morph+
 
-A maintained adaptation of **aNMJ-morph**, the Fiji/ImageJ macro for rapid quantitative analysis of neuromuscular junction (NMJ) morphology described by Minty et al. (2020).
+A maintained adaptation of **aNMJ-morph** by **Abdullah Alzeiby**, based on the Fiji/ImageJ macro for rapid quantitative analysis of neuromuscular junction (NMJ) morphology described by Minty et al. (2020).
 
 This repository keeps the original aNMJ-morph workflow and reference material while adding targeted fixes, safer image handling, automated validation, and documentation. It is **not the official upstream aNMJ-morph distribution**.
 
@@ -85,9 +85,9 @@ The repository also contains the original tutorial video, 20 reference NMJ image
 
 ## Automated validation and releases
 
-GitHub Actions runs repository checks on pushes and pull requests. The checks cover the rectangular-image formula, ambiguous C/Z handling, time-series rejection, consistent channel ordering, TIFF batch support, diagnostic output, historical output naming, the bundled reference-image count, and basic macro delimiter/string integrity.
+GitHub Actions runs repository checks on pushes and pull requests. The checks cover the rectangular-image formula, ambiguous C/Z handling, time-series rejection, consistent channel ordering, TIFF batch support, diagnostic output, historical output naming, the bundled reference-image count, licensing attribution, citation metadata, and basic macro delimiter/string integrity.
 
-Tags matching `v*` run the same validation and then publish a GitHub release containing the macro, README, `LICENSE`, reference spreadsheet, reference images, and a SHA-256 checksum.
+Tags matching `v*` run the same validation and then publish a GitHub release containing the macro, README, `LICENSE`, `CITATION.cff`, reference spreadsheet, reference images, and a SHA-256 checksum.
 
 ## Scientific-use note
 
@@ -97,7 +97,13 @@ For publication-grade use, validate the modified workflow on representative imag
 
 ## Attribution and citations
 
-This repository is derived from the aNMJ-morph macro and supporting dataset created by Minty, Hoppen, Boehm, and colleagues at the University of Edinburgh. If you use this code or the included reference material, cite the original aNMJ-morph paper and dataset. If the NMJ-morph methodology is central to the work, cite the parent method as well.
+**aNMJ-morph+ is adapted and maintained by Abdullah Alzeiby.** The modifications and additions specific to this repository are attributed to Abdullah Alzeiby; the original aNMJ-morph material remains attributed to its original creators.
+
+If you use **aNMJ-morph+** in research, please cite this repository **in addition to** the original aNMJ-morph work below. GitHub can generate citation formats from `CITATION.cff` via the repository's **Cite this repository** interface.
+
+**aNMJ-morph+ software:** Abdullah Alzeiby. *aNMJ-morph+*. GitHub repository. https://github.com/alzeiby/aNMJ-morph-plus
+
+This repository is derived from the aNMJ-morph macro and supporting dataset created by Minty, Hoppen, Boehm, and colleagues at the University of Edinburgh. Cite the original aNMJ-morph paper and dataset when using the derived workflow or included reference material. If the NMJ-morph methodology is central to the work, cite the parent method as well.
 
 1. **Minty G, Hoppen A, Boehm I, et al.** aNMJ-morph: a simple macro for rapid analysis of neuromuscular junction morphology. *Royal Society Open Science*. 2020;7:200128. https://doi.org/10.1098/rsos.200128
 2. **Jones RA, Reich CD, Dissanayake KN, et al.** NMJ-morph reveals principal components of synaptic morphology influencing structure-function relationships at the neuromuscular junction. *Open Biology*. 2016;6:160240. https://doi.org/10.1098/rsob.160240
@@ -109,6 +115,6 @@ This repository is derived from the aNMJ-morph macro and supporting dataset crea
 
 The original Edinburgh DataShare distribution uses the Creative Commons Attribution 4.0 International license. This repository consolidates the applicable license, original-source attribution, modification notice, and links to the complete CC BY 4.0 terms in `LICENSE`.
 
-Fork-authored modifications in this repository are also made available under **CC BY 4.0** unless otherwise noted.
+The aNMJ-morph+ adaptation, modifications, and additions are authored by **Abdullah Alzeiby** and are also made available under **CC BY 4.0** unless otherwise noted.
 
-When redistributing modified versions, preserve attribution to the original creators, link to the source dataset, identify that changes were made, and retain the applicable license information.
+When redistributing aNMJ-morph+, preserve attribution to both the original creators and Abdullah Alzeiby, link to the original source dataset and this repository, identify that changes were made, and retain the applicable license information.
