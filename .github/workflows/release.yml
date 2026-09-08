@@ -24,25 +24,7 @@ jobs:
         run: python tests/repository_checks.py
 
       - name: Build release archive
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="${GITHUB_REF_NAME}"
-          package="aNMJ-morph-plus-${version}"
-          mkdir -p "dist/${package}"
-
-          cp "aNMJ-morph macro.txt" license.txt license_text "Reference Spreadsheet.xlsx" "dist/${package}/"
-          cp -R "Reference Images" "dist/${package}/Reference Images"
-
-          for optional_file in README.md LICENSE; do
-            if [[ -f "${optional_file}" ]]; then
-              cp "${optional_file}" "dist/${package}/"
-            fi
-          done
-
-          cd dist
-          zip -r "${package}.zip" "${package}"
-          sha256sum "${package}.zip" > "${package}.zip.sha256"
+        run: bash scripts/package_release.sh "${GITHUB_REF_NAME}"
 
       - name: Publish GitHub release
         env:
