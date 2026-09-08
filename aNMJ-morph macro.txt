@@ -17,6 +17,9 @@ function printIfEnabled(message) {
 }
 
 function safeSelectWindow(windowTitle) {
+  if (getTitle() == windowTitle) {
+    return;
+  }
   wait(100);
   selectWindow(windowTitle);
 }
@@ -205,7 +208,6 @@ function processOpenImage(fileName) {
   getLocationAndSize(x, y, width, height);
   setLocation(50, 50);
   safeSelectWindow("C2-" + templateFileName);
-  getLocationAndSize(x2, y2, width2, height2);
   setLocation(100 + width, 50);
 
   safeSelectWindow("C2-" + originalTitle);
@@ -231,7 +233,6 @@ function processOpenImage(fileName) {
   getLocationAndSize(x, y, width, height);
   setLocation(50, 50);
   safeSelectWindow("C1-" + templateFileName);
-  getLocationAndSize(x2, y2, width2, height2);
   setLocation(100+width, 50);
   safeSelectWindow("C1-" + originalTitle);
 
@@ -256,10 +257,11 @@ function processOpenImage(fileName) {
   run("Set Measurements...", "  redirect=None decimal=8");
   safeWaitForUser("Screen 4/7 Measuring Axon Width. \nLine tool is already selected. \nMeasure by drawing line and pressing 'M' on keyboard. \nThree measurements are required: \n   1) Maximum axon width \n   2) Minimum axon width \n   3) Axon hillock width \n-\n\Hint: Axon hillock is where axon meets nerve terminals. \nHint: Zoom in for accurate measurement of thin axons. \nPress 'ctrl' and '+' or '-' to zoom in or out. \n-\nNotes: Axon width will be recorded automatically using the average of the three measurements. \nEnsure that extra measurements are deleted from 'results tab' before pressing OK. \nIf no axon is present, press OK. \n-\nPress OK.");
 
-  resultsArray = newArray();
-  for (i=0; i<nResults();i++) {;
-    resultsArray = Array.concat(resultsArray, getResult("Length", i));
-  };
+  resultsCount = nResults();
+  resultsArray = newArray(resultsCount);
+  for (i=0; i<resultsCount; i++) {
+    resultsArray[i] = getResult("Length", i);
+  }
   Array.getStatistics(resultsArray,min,max,avg,stdev);
   axonDiameter = avg;
   printIfEnabled("Axon diameter: " + axonDiameter);
@@ -312,9 +314,6 @@ function processOpenImage(fileName) {
   run("Measure");
   endplateDiameter = getResult("Feret");
   printIfEnabled("Endplate diameter: " + endplateDiameter);
-
-  run("Create Selection");
-  run("Measure");
   endplateArea = getResult("Area");
   printIfEnabled("Endplate area: " + endplateArea);
   endplatePerimeter = getResult("Perim.");
