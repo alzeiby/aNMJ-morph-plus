@@ -36,6 +36,14 @@ function safeWaitForUser(message) {
   selectImage(currentImageId);
 }
 
+function makeTiffFilename(prefix, title) {
+  dotIndex = lastIndexOf(title, ".");
+  if (dotIndex > 0) {
+    title = substring(title, 0, dotIndex);
+  }
+  return prefix + title + ".tif";
+}
+
 // Install Paintbrush Tool Options & other StartupMacros - 
 // FIJI has a bug where it kicks out all StartupMacros when installing a Macro
 macrosDirectory = getDirectory("macros");
@@ -54,33 +62,41 @@ if (list.length == 0) {
 function processOpenImage(fileName) {
   originalTitle = getTitle();
   originalDirectory = getDirectory("image");
-  destination = originalDirectory + File.separator + "cleaned_images" + File.separator;
-  axonFilename = "axon_terminal" + getTitle();
-  axonFilename = substring(axonFilename, 0, lastIndexOf(axonFilename, ".")) + ".tif";
+  if (originalDirectory == "") {
+    originalDirectory = getDirectory("Select folder for analysis output");
+    if (originalDirectory == "") {
+      exit("Error: An output folder is required");
+    }
+  }
+  if (!endsWith(originalDirectory, File.separator)) {
+    originalDirectory = originalDirectory + File.separator;
+  }
+
+  destination = originalDirectory + "cleaned_images" + File.separator;
+  File.makeDirectory(destination);
+
+  axonFilename = makeTiffFilename("axon_terminal_", originalTitle);
   axonFilepath = destination + axonFilename;
 
-  endplateFilename = "muscle_endplate" + getTitle();
-  endplateFilename = substring(endplateFilename, 0, lastIndexOf(endplateFilename, ".")) + ".tif";
+  endplateFilename = makeTiffFilename("muscle_endplate_", originalTitle);
   endplateFilepath = destination + endplateFilename;
 
-  endplateIntermediateFilename = "muscle_intermediate_endplate" + getTitle();
-  endplateIntermediateFilename = substring(endplateIntermediateFilename, 0, lastIndexOf(endplateIntermediateFilename, ".")) + ".tif";
+  endplateIntermediateFilename = makeTiffFilename("muscle_intermediate_endplate_", originalTitle);
   endplateIntermediateFilepath = destination + endplateIntermediateFilename;
   
   // In case images are taken as hyperstacks, a Maximum Intensity Projection is created
   if (is ("hyperstack")) {
     run("Z Project...", "projection=[Max Intensity]");
-    fileName = originalDirectory +File.separator+ getTitle();
-    saveAs("tiff", fileName);
     MAXtitle = getTitle();
     safeSelectWindow(originalTitle);
     close();
     safeSelectWindow(MAXtitle);
     originalTitle = getTitle();
   }
-  fileName = originalDirectory +File.separator+ originalTitle;
 
-  File.makeDirectory(destination);
+  sourceCopyTitle = "__aNMJ_source_" + getImageID();
+  run("Duplicate...", "title=[" + sourceCopyTitle + "] duplicate");
+  safeSelectWindow(originalTitle);
 
   outputFilename = originalDirectory + "raw_data_table.csv";
 
@@ -140,12 +156,13 @@ function processOpenImage(fileName) {
   run("Split Channels");
   run("Threshold...");
   
-  // Open second image as a Template for thresholding
-  open(fileName);
+  // Create a second image in memory as a template for thresholding
+  safeSelectWindow(sourceCopyTitle);
+  templateTitle = "__aNMJ_template_" + getImageID();
+  run("Duplicate...", "title=[" + templateTitle + "] duplicate");
+  safeSelectWindow(templateTitle);
   run("Arrange Channels...", "new=" + muscleEndplateChannel + '' + nerveTerminalChannel);
   Stack.setChannel(1);
-  templateFileName = fileName + "_template.tif";
-  saveAs("tiff",templateFileName);
   run("Split Channels");
   
   setTool(19);
@@ -155,7 +172,7 @@ function processOpenImage(fileName) {
   safeSelectWindow("C2-" + originalTitle);
   getLocationAndSize(x, y, width, height);
   setLocation(50, 50);
-  safeSelectWindow("C2-" + File.getName(templateFileName));
+  safeSelectWindow("C2-" + templateTitle);
   getLocationAndSize(x2, y2, width2, height2);
   setLocation(100 + width, 50);
   
@@ -170,7 +187,7 @@ function processOpenImage(fileName) {
   saveAs("Tiff", axonFilepath);
 
   // Close template of nerve terminal after thresholding
-  safeSelectWindow("C2-" + File.getName(templateFileName));
+  safeSelectWindow("C2-" + templateTitle);
   close();
     
   safeSelectWindow("Threshold");
@@ -184,7 +201,7 @@ function processOpenImage(fileName) {
   safeSelectWindow("C1-" + originalTitle);
   getLocationAndSize(x, y, width, height);
   setLocation(50, 50);
-  safeSelectWindow("C1-" + File.getName(templateFileName));
+  safeSelectWindow("C1-" + templateTitle);
   getLocationAndSize(x2, y2, width2, height2);
   setLocation(100+width, 50);
   safeSelectWindow("C1-" + originalTitle);
@@ -202,15 +219,9 @@ function processOpenImage(fileName) {
   safeSelectWindow("C1-" + originalTitle);
   saveAs("Tiff", endplateFilepath);
   
-  // Close Template of Endplate after thresholding & delete temporary file
-  safeSelectWindow("C1-" + File.getName(templateFileName));
+  // Close Template of Endplate after thresholding
+  safeSelectWindow("C1-" + templateTitle);
   close();
-  File.delete(templateFileName);
-  if (!printIntermediateResults) {
-    // The log was opened for the result of File.delete. Close it again
-    safeSelectWindow('Log');
-    run('Close');
-  }
   
   setTool(4);
   safeSelectWindow(axonFilename);
@@ -308,7 +319,10 @@ function processOpenImage(fileName) {
   run("Close");
   safeSelectWindow("AVG_Concatenated Stacks");
   run("Close");
-  open(originalDirectory + "/" + originalTitle);
+  safeSelectWindow(sourceCopyTitle);
+  segmentCopyTitle = "__aNMJ_segment_" + getImageID();
+  run("Duplicate...", "title=[" + segmentCopyTitle + "] duplicate");
+  safeSelectWindow(segmentCopyTitle);
   run("Arrange Channels...", "new=" + muscleEndplateChannel + '' + nerveTerminalChannel);
   Stack.setChannel(1);
   
@@ -327,9 +341,8 @@ function processOpenImage(fileName) {
 
   run("Fill Holes");
   open(endplateIntermediateFilepath);
-  safeSelectWindow("C1-" + originalTitle);
-  run("Close");
-  run("Concatenate...", "title=[Concatenated Stacks] open image1=[C1-" + originalTitle + " Segmented] image2=[" + endplateIntermediateFilename + "]");
+  safeSelectWindow("C1-" + segmentCopyTitle + " Segmented");
+  run("Concatenate...", "title=[Concatenated Stacks] open image1=[C1-" + segmentCopyTitle + " Segmented] image2=[" + endplateIntermediateFilename + "]");
 
   run("Z Project...", "projection=[Average Intensity]");
   setOption("BlackBackground", false);
@@ -340,6 +353,11 @@ function processOpenImage(fileName) {
   printIfEnabled("Number of clusters: " + numberOfClusters);
   safeSelectWindow("Results");
   run("Close");
+
+  if (isOpen(sourceCopyTitle)) {
+    safeSelectWindow(sourceCopyTitle);
+    run("Close");
+  }
 
   if (File.exists(outputFilename)) {
     fileContents = File.openAsString(outputFilename);
