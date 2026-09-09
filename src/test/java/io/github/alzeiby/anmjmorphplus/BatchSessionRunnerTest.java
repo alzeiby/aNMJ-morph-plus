@@ -69,6 +69,30 @@ public class BatchSessionRunnerTest {
     }
 
     @Test
+    public void cancellationAfterOutputChangesStillStopsTheSession() throws Exception {
+        final Path root = temporaryFolder.newFolder("cancel-after-output").toPath();
+        final Path first = touch(root.resolve("a.tif"));
+        touch(root.resolve("b.tif"));
+        final BatchCheckpointStore store = new BatchCheckpointStore();
+        final List<String> processed = new ArrayList<>();
+
+        runner(root, store, (path, choices) -> {
+            processed.add(path.getFileName().toString());
+            if (path.equals(first)) {
+                commitOutputs(path);
+                throw BatchFileException.cancelled("cancel after commit");
+            }
+            throw new AssertionError("files after cancellation must not run");
+        }).run();
+
+        assertEquals(List.of("a.tif"), processed);
+        final BatchCheckpointStore.Session session = store.load(root);
+        assertEquals(BatchCheckpointStore.Status.NEEDS_REVIEW, session.files.get("a.tif").status);
+        assertEquals("OUTPUT_STATE_AMBIGUOUS", session.files.get("a.tif").reasonCode);
+        assertFalse(session.files.containsKey("b.tif"));
+    }
+
+    @Test
     public void runtimeFailureDoesNotStopLaterFiles() throws Exception {
         final Path root = temporaryFolder.newFolder("continue").toPath();
         final Path a = touch(root.resolve("a.tif"));

@@ -197,6 +197,9 @@ final class BatchSessionRunner implements WorkflowRunner {
         } catch (BatchCheckpointStore.BatchCheckpointException e) {
             throw e;
         } catch (BatchFileException e) {
+            if (e.kind() == BatchFileException.Kind.CANCELLED) {
+                stopSession = true;
+            }
             final OutputState output = outputState(file, record.csvLinesBefore);
             if (output != OutputState.UNCHANGED) {
                 mark(record, BatchCheckpointStore.Status.NEEDS_REVIEW, "OUTPUT_STATE_AMBIGUOUS",
@@ -205,7 +208,6 @@ final class BatchSessionRunner implements WorkflowRunner {
                 mark(record, BatchCheckpointStore.Status.FAILED_PRECHECK, e.reasonCode(), e.getMessage());
             } else if (e.kind() == BatchFileException.Kind.CANCELLED) {
                 mark(record, BatchCheckpointStore.Status.CANCELLED, e.reasonCode(), e.getMessage());
-                stopSession = true;
             } else {
                 mark(record, BatchCheckpointStore.Status.FAILED_RUNTIME, e.reasonCode(), e.getMessage());
             }
