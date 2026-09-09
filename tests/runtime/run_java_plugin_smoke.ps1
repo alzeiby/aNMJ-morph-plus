@@ -2,71 +2,49 @@ param(
     [Parameter(Mandatory=$true)]
     [string]$FijiRoot,
     [Parameter(Mandatory=$true)]
-    [string]$PluginJar,
-    [int]$TimeoutSeconds = 60
+    [string]$PluginJar
 )
 
 $ErrorActionPreference = 'Stop'
 $runtimeDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $workDir = Join-Path $runtimeDir '_work\java-plugin-smoke'
-$harness = (Resolve-Path -LiteralPath (Join-Path $runtimeDir 'java_plugin_smoke.ijm')).Path
+$source = (Resolve-Path -LiteralPath (Join-Path $runtimeDir 'JavaPluginSmoke.java')).Path
 $FijiRoot = (Resolve-Path -LiteralPath $FijiRoot).Path
 $PluginJar = (Resolve-Path -LiteralPath $PluginJar).Path
-$fiji = Join-Path $FijiRoot 'fiji-windows-x64.exe'
-$fijiLauncher = Join-Path $FijiRoot 'fiji.bat'
-$pluginsDir = Join-Path $FijiRoot 'plugins'
-$installedJar = Join-Path $pluginsDir 'aNMJ-morph-plus.jar'
-$trace = Join-Path $workDir 'trace.txt'
 
-if (-not (Test-Path -LiteralPath $fiji)) {
-    throw "Could not find fresh Fiji executable: $fiji"
-}
-if (-not (Test-Path -LiteralPath $fijiLauncher)) {
-    throw "Could not find Fiji launcher: $fijiLauncher"
+$java = Get-ChildItem (Join-Path $FijiRoot 'java\win64') -Recurse -Filter 'java.exe' |
+    Select-Object -First 1
+$javac = Get-ChildItem (Join-Path $FijiRoot 'java\win64') -Recurse -Filter 'javac.exe' |
+    Select-Object -First 1
+if (-not $java -or -not $javac) {
+    throw 'Could not find the Java runtime bundled with the pinned Fiji installation.'
 }
 
 New-Item -ItemType Directory -Force -Path $workDir | Out-Null
-Copy-Item -LiteralPath $PluginJar -Destination $installedJar -Force
-if (Test-Path -LiteralPath $trace) {
-    Remove-Item -LiteralPath $trace -Force
+$classFile = Join-Path $workDir 'JavaPluginSmoke.class'
+if (Test-Path -LiteralPath $classFile) {
+    Remove-Item -LiteralPath $classFile -Force
 }
 
-$existing = Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq $fiji }
-if ($existing) {
-    throw 'The validation Fiji installation is already running. Close it before automated validation.'
+$separator = [IO.Path]::PathSeparator
+$classpath = @(
+    (Join-Path $FijiRoot 'jars\*'),
+    (Join-Path $FijiRoot 'plugins\*'),
+    $PluginJar,
+    $workDir
+) -join $separator
+
+& $javac.FullName '-proc:none' '-cp' $classpath '-d' $workDir $source
+if ($LASTEXITCODE -ne 0) {
+    throw 'Could not compile Java plugin smoke against the pinned Fiji runtime.'
 }
 
-$quotedHarness = '"' + $harness + '"'
-$quotedTrace = '"' + $trace + '"'
-$process = Start-Process -FilePath $fijiLauncher -ArgumentList @('--headless', '--console', '-port0', '-macro', $quotedHarness, $quotedTrace) -PassThru -WindowStyle Hidden
-$deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-$complete = $false
-
-try {
-    while ((Get-Date) -lt $deadline) {
-        if (Test-Path -LiteralPath $trace) {
-            $traceText = Get-Content -LiteralPath $trace -Raw
-            if ($traceText -like '*DONE java plugin smoke*') {
-                $complete = $true
-                break
-            }
-        }
-        Start-Sleep -Milliseconds 250
-    }
-} finally {
-    $runningFiji = Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq $fiji }
-    foreach ($item in $runningFiji) {
-        Stop-Process -Id $item.ProcessId -Force -ErrorAction SilentlyContinue
-    }
-    if (-not $process.HasExited) {
-        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-        $process.WaitForExit()
-    }
+$output = & $java.FullName '-Djava.awt.headless=true' '-cp' $classpath 'JavaPluginSmoke' 2>&1
+if ($LASTEXITCODE -ne 0) {
+    throw "Java plugin smoke failed:`n$($output -join "`n")"
 }
-
-if (-not $complete) {
-    $tail = if (Test-Path -LiteralPath $trace) { (Get-Content -LiteralPath $trace -Tail 8) -join "`n" } else { '<no trace>' }
-    throw "Java plugin smoke test did not complete within $TimeoutSeconds seconds.`n$tail"
+if (($output -join "`n") -notlike '*DONE java plugin smoke*') {
+    throw "Java plugin smoke did not report completion:`n$($output -join "`n")"
 }
 
 Write-Output 'aNMJ-morph+ Java plugin fresh-Fiji smoke passed.'

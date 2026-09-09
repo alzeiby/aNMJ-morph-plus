@@ -91,14 +91,14 @@ jobs:
       - name: Build Java plugin
         run: mvn -B -ntp -DskipTests package
 
-      - name: Smoke-test Java plugin in fresh Fiji
+      - name: Smoke-test Java plugin against fresh Fiji
         shell: powershell
         run: |
           $jar = Get-ChildItem -LiteralPath .\target -Filter 'anmj-morph-plus-*.jar' |
             Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-javadoc.jar' } |
             Select-Object -First 1
           if (-not $jar) { throw 'Could not find built aNMJ-morph+ plugin JAR' }
-          .\tests\runtime\run_java_plugin_smoke.ps1 -FijiRoot $env:FIJI_ROOT -PluginJar $jar.FullName -TimeoutSeconds 90
+          .\tests\runtime\run_java_plugin_smoke.ps1 -FijiRoot $env:FIJI_ROOT -PluginJar $jar.FullName
 
       - name: Run fixture matrix and regression workflows
         shell: powershell
