@@ -19,7 +19,7 @@ public class SingleImageAnalysisRunnerTest {
         info.fileName = "original-on-disk-name.tif";
         image.setFileInfo(info);
 
-        final Path actual = SingleImageAnalysisRunner.pathForCurrentImage(image);
+        final Path actual = ANMJMorphCommand.pathForCurrentImage(image);
 
         assertEquals(Path.of(info.directory).resolve("renamed-current-title.tif"), actual);
     }

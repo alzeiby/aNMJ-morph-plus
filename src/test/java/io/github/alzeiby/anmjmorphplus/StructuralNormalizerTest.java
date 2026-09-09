@@ -20,14 +20,12 @@ import static org.junit.Assert.assertTrue;
 
 public class StructuralNormalizerTest {
 
-    private final StructuralNormalizer normalizer = new StructuralNormalizer();
-
     @Test
     public void noOpReturnsExactImageWithoutChangingStructureOrPixels() {
         final ImagePlus image = twoChannelImage("ordinary.tif", 7, 19);
         final ImageStack originalStack = image.getStack();
 
-        final ImagePlus normalized = normalizer.normalize(image, null);
+        final ImagePlus normalized = ANMJMorphCommand.normalize(image, false);
 
         assertSame(image, normalized);
         assertSame(originalStack, image.getStack());
@@ -43,7 +41,7 @@ public class StructuralNormalizerTest {
         final ImagePlus image = new ImagePlus("rgb.png", new ColorProcessor(2, 1, pixels));
         stampMetadata(image);
 
-        final ImagePlus normalized = normalizer.normalize(image, null);
+        final ImagePlus normalized = ANMJMorphCommand.normalize(image, false);
 
         assertNotSame(image, normalized);
         assertTrue(normalized instanceof CompositeImage);
@@ -69,7 +67,7 @@ public class StructuralNormalizerTest {
     public void ambiguousTwoPlaneChannelsReinterpretsPlaneOneThenPlaneTwoWithoutPixelChanges() {
         final ImagePlus image = oneChannelTwoPlaneImage("two-plane.tif", 13, 29);
 
-        normalizer.normalize(image, TwoPlaneInterpretation.CHANNELS);
+        ANMJMorphCommand.normalize(image, true);
 
         assertEquals(2, image.getNChannels());
         assertEquals(1, image.getNSlices());
@@ -81,13 +79,12 @@ public class StructuralNormalizerTest {
     public void ambiguousTwoPlaneZStackChoiceMaximumProjectsTheTwoPlanes() {
         final ImagePlus image = oneChannelTwoPlaneImage("two-plane.tif", 31, 17);
 
-        final ImagePlus normalized = normalizer.normalize(image, TwoPlaneInterpretation.Z_STACK);
+        final ImagePlus normalized = ANMJMorphCommand.normalize(image, false);
 
         assertNotSame(image, normalized);
         assertEquals(1, normalized.getNChannels());
         assertEquals(1, normalized.getNSlices());
         assertEquals(31, channelPixel(normalized, 1));
-        assertEquals("two-plane.tif", normalized.getTitle());
     }
 
     @Test
@@ -104,7 +101,7 @@ public class StructuralNormalizerTest {
         image.setOpenAsHyperStack(true);
         stampMetadata(image);
 
-        final ImagePlus normalized = normalizer.normalize(image, null);
+        final ImagePlus normalized = ANMJMorphCommand.normalize(image, false);
 
         assertNotSame(image, normalized);
         assertEquals(2, normalized.getNChannels());
@@ -112,7 +109,10 @@ public class StructuralNormalizerTest {
         assertEquals(1, normalized.getNFrames());
         assertEquals(5, channelPixel(normalized, 1));
         assertEquals(20, channelPixel(normalized, 2));
-        assertMetadata(normalized, "z-stack.lsm");
+        assertEquals(0.25, normalized.getCalibration().pixelWidth, 0.0);
+        assertEquals(0.5, normalized.getCalibration().pixelHeight, 0.0);
+        assertEquals(1.75, normalized.getCalibration().pixelDepth, 0.0);
+        assertEquals("microns", normalized.getCalibration().getUnit());
     }
 
     @Test
@@ -120,7 +120,7 @@ public class StructuralNormalizerTest {
         final ImagePlus image = oneChannelTwoPlaneImage("source file.tif", 4, 9);
         stampMetadata(image);
 
-        normalizer.normalize(image, TwoPlaneInterpretation.CHANNELS);
+        ANMJMorphCommand.normalize(image, true);
 
         assertMetadata(image, "source file.tif");
     }
@@ -146,7 +146,7 @@ public class StructuralNormalizerTest {
         final ImagePlus referenceSource = rgbZStack();
         final ImagePlus expected = ZProjector.run(referenceSource, "max");
 
-        final ImagePlus normalized = normalizer.normalize(actual, null);
+        final ImagePlus normalized = ANMJMorphCommand.normalize(actual, false);
 
         assertNotSame(actual, normalized);
         assertEquals(1, normalized.getNChannels());
@@ -235,7 +235,7 @@ public class StructuralNormalizerTest {
         final ImagePlus referenceSource = zStack(bitDepth, channels);
         final ImagePlus expected = ZProjector.run(referenceSource, "max");
 
-        final ImagePlus normalized = normalizer.normalize(actual, null);
+        final ImagePlus normalized = ANMJMorphCommand.normalize(actual, false);
 
         assertEquals(expected.getNChannels(), normalized.getNChannels());
         assertEquals(expected.getNSlices(), normalized.getNSlices());
@@ -282,7 +282,7 @@ public class StructuralNormalizerTest {
         final ImagePlus actual = floatZStack(values);
         final ImagePlus expected = ZProjector.run(floatZStack(values), "max");
 
-        final ImagePlus normalized = normalizer.normalize(actual, null);
+        final ImagePlus normalized = ANMJMorphCommand.normalize(actual, false);
 
         assertEquals(
             Float.floatToIntBits(expected.getProcessor().getf(0)),

@@ -18,8 +18,10 @@ import ij.plugin.tool.BrushTool;
 
 import java.awt.Color;
 import java.awt.Window;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.function.Consumer;
+import java.nio.file.StandardOpenOption;
 
 final class AnalysisWorkflow {
 
@@ -48,11 +50,22 @@ final class AnalysisWorkflow {
     void analyze(
         final ImagePlus image,
         final Path inputPath,
-        final BatchChoiceResolver.ChannelChoice channelChoice,
-        final Consumer<AnalysisResult> resultConsumer
+        final int muscleChannel,
+        final int nerveChannel
     ) {
-        final AnalysisOutputPaths paths = AnalysisOutputPaths.forInput(inputPath);
-        paths.ensureCleanedDirectory();
+        final Path parent = inputPath.toAbsolutePath().normalize().getParent();
+        final String name = inputPath.getFileName().toString();
+        final int dot = name.lastIndexOf('.');
+        final String stem = dot > 0 ? name.substring(0, dot) : name;
+        final Path cleaned = parent.resolve("cleaned_images");
+        try {
+            Files.createDirectories(cleaned);
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not create cleaned_images directory", e);
+        }
+        final Path axonPath = cleaned.resolve("axon_terminal" + stem + ".tif");
+        final Path endplatePath = cleaned.resolve("muscle_endplate" + stem + ".tif");
+        final Path intermediatePath = cleaned.resolve("muscle_intermediate_endplate" + stem + ".tif");
         final int width = image.getWidth();
         final int height = image.getHeight();
         final double pixelSizeX = image.getCalibration().pixelWidth;
@@ -67,8 +80,8 @@ final class AnalysisWorkflow {
 
         final ImagePlus sourceCopy = duplicate(image, "__aNMJ_source_" + image.getID());
         final ImagePlus templateCopy = duplicate(sourceCopy, "__aNMJ_template_" + sourceCopy.getID());
-        final Channels original = splitSelected(image, channelChoice);
-        final Channels template = splitSelected(templateCopy, channelChoice);
+        final Channels original = splitSelected(image, muscleChannel, nerveChannel);
+        final Channels template = splitSelected(templateCopy, muscleChannel, nerveChannel);
 
         selectPaintbrush();
         Toolbar.setForegroundColor(Color.BLACK);
@@ -80,7 +93,7 @@ final class AnalysisWorkflow {
         Prefs.blackBackground = false;
         IJ.run(original.nerve, "Make Binary", "thresholded remaining black");
         IJ.run(original.nerve, "Despeckle", "");
-        IJ.saveAs(original.nerve, "Tiff", paths.axon.toString());
+        IJ.saveAs(original.nerve, "Tiff", axonPath.toString());
         closeImage(template.nerve);
         closeThreshold();
 
@@ -91,7 +104,7 @@ final class AnalysisWorkflow {
         IJ.run(original.muscle, "Make Binary", "thresholded remaining black");
         IJ.run(original.muscle, "Despeckle", "");
         closeThreshold();
-        IJ.saveAs(original.muscle, "Tiff", paths.endplate.toString());
+        IJ.saveAs(original.muscle, "Tiff", endplatePath.toString());
         closeImage(template.muscle);
 
         Toolbar.getInstance().setTool(4);
@@ -108,7 +121,7 @@ final class AnalysisWorkflow {
 
         IJ.run("Set Measurements...", "area mean min perimeter feret's redirect=None decimal=8");
         IJ.run(original.nerve, "Create Selection", "");
-        final AnalysisResult.Measurement nerveMeasurement = measure(original.nerve);
+        final double[] nerveMeasurement = measure(original.nerve);
 
         IJ.run(original.nerve, "Make Binary", "thresholded remaining black");
         IJ.run(original.nerve, "Convert to Mask", "");
@@ -124,19 +137,19 @@ final class AnalysisWorkflow {
         closeImage(original.nerve);
 
         IJ.run(original.muscle, "Create Selection", "");
-        final AnalysisResult.Measurement achrMeasurement = measure(original.muscle);
+        final double[] achrMeasurement = measure(original.muscle);
         makeCurrent(original.muscle);
         IJ.run(original.muscle, "Subtract Background...", "rolling=50 create");
         final ImagePlus intermediate = original.muscle;
         IJ.run(intermediate, "Make Binary", "thresholded remaining black");
         IJ.run(intermediate, "Create Selection", "");
-        final AnalysisResult.Measurement endplateMeasurement = measure(intermediate);
-        IJ.saveAs(intermediate, "Tiff", paths.endplateIntermediate.toString());
+        final double[] endplateMeasurement = measure(intermediate);
+        IJ.saveAs(intermediate, "Tiff", intermediatePath.toString());
         closeImage(intermediate);
         closeImage(original.muscle);
 
-        final ImagePlus reopenedAxon = openTiff(paths.axon);
-        final ImagePlus reopenedEndplate = openTiff(paths.endplate);
+        final ImagePlus reopenedAxon = openTiff(axonPath);
+        final ImagePlus reopenedEndplate = openTiff(endplatePath);
         IJ.run(reopenedEndplate, "Invert", "");
         final Concatenator overlapConcatenator = new Concatenator();
         overlapConcatenator.setIm5D(false);
@@ -150,13 +163,13 @@ final class AnalysisWorkflow {
         overlapAverage.show();
         IJ.run(overlapAverage, "Make Binary", "");
         IJ.run(overlapAverage, "Create Selection", "");
-        final AnalysisResult.Measurement unoccupiedMeasurement = measure(overlapAverage);
+        final double[] unoccupiedMeasurement = measure(overlapAverage);
         clearResults();
         closeImage(overlapConcat);
         closeImage(overlapAverage);
 
         final ImagePlus segmentCopy = duplicate(sourceCopy, "__aNMJ_segment_" + sourceCopy.getID());
-        final Channels segment = splitSelected(segmentCopy, channelChoice);
+        final Channels segment = splitSelected(segmentCopy, muscleChannel, nerveChannel);
         closeImage(segment.nerve);
         IJ.run(segment.muscle, "Make Binary", "");
         IJ.run(segment.muscle, "Find Maxima...", "noise=10 output=[Segmented Particles]");
@@ -165,7 +178,7 @@ final class AnalysisWorkflow {
         final boolean imageAlright = prompter.confirmSegmentation(SCREEN6);
         IJ.run(segmented, "Fill Holes", "");
 
-        final ImagePlus reopenedIntermediate = openTiff(paths.endplateIntermediate);
+        final ImagePlus reopenedIntermediate = openTiff(intermediatePath);
         final Concatenator stage6Concatenator = new Concatenator();
         stage6Concatenator.setIm5D(true);
         final ImagePlus finalConcat = stage6Concatenator.concatenate(
@@ -187,28 +200,23 @@ final class AnalysisWorkflow {
         closeImage(segmented);
         closeImage(reopenedIntermediate);
 
-        final AnalysisResult result = new AnalysisResult(
-            width,
-            height,
-            pixelSizeX,
-            pixelSizeY,
-            sizeUnit,
-            inputPath.getFileName().toString(),
-            thresholdNerve + "/" + thresholdEndplate,
-            axonDiameter,
-            counts0,
-            counts2,
-            counts4,
-            counts5,
-            totalLengthOfBranches,
-            nerveMeasurement,
-            achrMeasurement,
-            endplateMeasurement,
-            unoccupiedMeasurement,
-            imageAlright,
-            numberOfClusters
-        );
-        resultConsumer.accept(result);
+        final Path csv = parent.resolve("raw_data_table.csv");
+        final int row = prepareCsv(csv);
+        final String[] fields = {
+            quote(width + " x " + height),
+            quote(format(pixelSizeX * width) + " x " + format(pixelSizeY * height) + sizeUnit),
+            inputPath.getFileName().toString(), thresholdNerve + "/" + thresholdEndplate, "", format(axonDiameter),
+            format(nerveMeasurement[1]), format(nerveMeasurement[0]), format(counts0), format(counts2), format(counts4),
+            format(counts5), quote("=J" + row), quote("=(K" + row + "+L" + row + ")*0.28"),
+            format(totalLengthOfBranches), quote("=O" + row + "/J" + row),
+            quote("=LOG10(M" + row + "*N" + row + "*O" + row + ")"), format(achrMeasurement[1]),
+            format(achrMeasurement[0]), format(endplateMeasurement[2]), format(endplateMeasurement[1]),
+            format(endplateMeasurement[0]), quote("=S" + row + "/V" + row + "*100"), format(unoccupiedMeasurement[0]),
+            quote("=S" + row + "-X" + row), quote("=(S" + row + "-X" + row + ")/S" + row + "*100"),
+            imageAlright ? format(numberOfClusters) : "", quote("=IF(AA" + row + ",S" + row + "/AA" + row + ",\"\")"),
+            quote("=IF(AA" + row + ",1-1/AA" + row + ",\"\")")
+        };
+        write(csv, String.join(",", fields) + "\n", StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         closeImage(finalConcat);
         closeImage(finalAverage);
     }
@@ -220,13 +228,14 @@ final class AnalysisWorkflow {
 
     private static Channels splitSelected(
         final ImagePlus source,
-        final BatchChoiceResolver.ChannelChoice choice
+        final int muscleChannel,
+        final int nerveChannel
     ) {
         ImagePlus selected = source;
         if (source.getNChannels() <= 9 &&
-            (source.getNChannels() != 2 || choice.muscleEndplateChannel != 1 || choice.nerveTerminalChannel != 2)) {
+            (source.getNChannels() != 2 || muscleChannel != 1 || nerveChannel != 2)) {
             selected = ChannelArranger.run(source,
-                new int[] {choice.muscleEndplateChannel, choice.nerveTerminalChannel});
+                new int[] {muscleChannel, nerveChannel});
             if (selected == null) throw new IllegalStateException("Could not arrange selected channels");
             selected.setCalibration(source.getCalibration());
         }
@@ -237,16 +246,54 @@ final class AnalysisWorkflow {
         return new Channels(split[0], split[1]);
     }
 
-    private static AnalysisResult.Measurement measure(final ImagePlus image) {
+    private static double[] measure(final ImagePlus image) {
         final ResultsTable table = Analyzer.getResultsTable();
         IJ.run(image, "Measure", "");
         final int row = table.size() - 1;
-        return new AnalysisResult.Measurement(
+        return new double[] {
             table.getValue("Area", row),
             table.getValue("Perim.", row),
             table.getValue("Feret", row)
-        );
+        };
     }
+
+    private static int prepareCsv(final Path csv) {
+        try {
+            if (!Files.exists(csv) || Files.size(csv) == 0) {
+                write(csv, CSV_HEADER_1 + "\n" + CSV_HEADER_2 + "\n",
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                return 3;
+            }
+            final byte[] contents = Files.readAllBytes(csv);
+            if (contents.length > 0 && contents[contents.length - 1] != '\n') {
+                write(csv, "\n", StandardOpenOption.APPEND);
+            }
+            return Files.readAllLines(csv).size() + 1;
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not prepare CSV output: " + csv, e);
+        }
+    }
+
+    private static String format(final double value) {
+        return IJ.d2s(value, 8);
+    }
+
+    private static String quote(final String value) {
+        return '"' + value.replace("\"", "\"\"") + '"';
+    }
+
+    private static void write(final Path path, final String text, final StandardOpenOption... options) {
+        try {
+            Files.writeString(path, text, options);
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not write CSV output: " + path, e);
+        }
+    }
+
+    private static final String CSV_HEADER_1 =
+        "IMAGE DETAILS (frame size),,NMJ,THRESHOLD,PRE-SYNAPTIC,,,,Branch analysis,,,,,,,,,POST-SYNAPTIC";
+    private static final String CSV_HEADER_2 =
+        "\"Number of pixels (eg, 512 x 512)\",\"Metric (eg, 67.48 x 67.48um)\",\"Ref number\",\"(nerve terminal/motor endplate)\",\"Number of Axonal Inputs\",\"Axon Diameter (um)\",\"Nerve Terminal Perimeter (um)\",\"Nerve Terminal Area (um2)\",\"Value 0 (background white pixels)\",\"Value 2 (terminal pixels)\",\"Value 4 (three-point branch pixels)\",\"Value 5 (four-point branch pixels)\",\" Number of Terminal Branches\",\"Number of Branch Points\",\"Total Length of Branches (um)\",\"Average Length of Branches (um)\",\"\"\"Complexity\"\"\",\"AChR Perimeter (um)\",\"AChR Area (um2)\",\"Endplate Diameter (um)\",\"Endplate Perimeter (um)\",\"Endplate Area (um2)\",\"\"\"Compactness\"\" (%)\",\"Unoccupied AChR Area (um2)\",\"\"\"Area of Synaptic Contact\"\" (um2)\",\"\"\"Overlap\"\" (%)\",\"Number of AChR Clusters\",\"Average Area of AChR Clusters (um2)\",\"\"\"Fragmentation\"\"\"";
 
     private static double meanLength(final ResultsTable table) {
         if (table == null || table.size() == 0) {
@@ -342,7 +389,7 @@ final class AnalysisWorkflow {
             dialog.addMessage(message);
             dialog.showDialog();
             if (dialog.wasCanceled() || IJ.escapePressed()) {
-                throw new AnalysisCancelledException();
+                throw new ANMJMorphCommand.Cancelled();
             }
             IJ.wait(100);
             makeCurrent(subject);
@@ -355,7 +402,7 @@ final class AnalysisWorkflow {
             dialog.addCheckbox("Image looks OK", true);
             dialog.showDialog();
             if (dialog.wasCanceled() || IJ.escapePressed()) {
-                throw new AnalysisCancelledException();
+                throw new ANMJMorphCommand.Cancelled();
             }
             return dialog.getNextBoolean();
         }
