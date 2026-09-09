@@ -18,9 +18,7 @@ def main() -> None:
     production = "\n".join(path.read_text(encoding="utf-8") for path in production_files)
     pom = text("pom.xml")
     analysis = text("src/main/java/io/github/alzeiby/anmjmorphplus/AnalysisWorkflow.java")
-    batch = text("src/main/java/io/github/alzeiby/anmjmorphplus/BatchSessionRunner.java")
-    single = text("src/main/java/io/github/alzeiby/anmjmorphplus/InputWorkflowRunner.java")
-    csv_writer = text("src/main/java/io/github/alzeiby/anmjmorphplus/CsvOutputWriter.java")
+    command = text("src/main/java/io/github/alzeiby/anmjmorphplus/ANMJMorphCommand.java")
     runtime = text("tests/runtime/run_direct_java_analysis.ps1")
     runtime_java = text("tests/runtime/DirectJavaAnalysisRuntime.java")
     fiji_ci = text(".github/workflows/fiji-runtime.yml")
@@ -34,13 +32,16 @@ def main() -> None:
     require("TemplateCopyDuplicator" not in production, "Transition duplicate wrapper still exists in production")
     require("aNMJ-morph macro.txt" not in pom, "Legacy macro is still packaged into the plugin JAR")
 
-    # Both interactive entry points must converge on the same direct Java scientific workflow.
-    require("new SingleImageAnalysisRunner()" in batch, "Batch mode is not routed to direct Java analysis")
-    require("new SingleImageAnalysisRunner()" in single, "Single-image mode is not routed to direct Java analysis")
-    require("new AnalysisWorkflow" in text("src/main/java/io/github/alzeiby/anmjmorphplus/SingleImageAnalysisRunner.java"),
-            "Single-image processor does not use AnalysisWorkflow")
-    require("BatchCheckpointStore" not in production and "BatchFileException" not in production,
-            "Retired checkpoint/error-state plumbing returned")
+    # Single image, current image and batch mode now share one thin command shell.
+    require("runBatch()" in command and "new AnalysisWorkflow().analyze" in command,
+            "Command does not route interactive/batch inputs to AnalysisWorkflow")
+    require("BF.openImagePlus" in command and "CompositeConverter.makeComposite" in command and
+            'ZProjector.run(image, "max")' in command,
+            "Input shell no longer delegates loading/normalization directly to Fiji APIs")
+    for retired in ("BatchCheckpointStore", "BatchFileException", "BatchChoiceResolver", "BatchSessionRunner",
+                    "ImageLoader", "InputWorkflowRunner", "SingleImageAnalysisRunner", "StructuralNormalizer",
+                    "SupportedImageFormat", "InputNormalization", "TwoPlaneInterpretation"):
+        require(retired not in production, f"Retired orchestration layer returned: {retired}")
 
     # Preserve the scientific method while delegating image operations to ImageJ/Fiji.
     for marker in (
@@ -83,10 +84,10 @@ def main() -> None:
     require("new BrushTool().run(\"\")" in analysis, "Paintbrush must use ImageJ BrushTool directly")
     require("Paintbrush Tool Options..." not in analysis, "Macro-only paintbrush command returned")
 
-    # The Java writer owns the exact historical raw table shape/formulas.
-    require("header1()" in csv_writer and "header2()" in csv_writer, "CSV headers are not owned by Java")
-    for formula in ("=J", "=(K", 'DECIMAL + "28"', "=LOG10(M", "=IF(AA"):
-        require(formula in csv_writer, f"Historical CSV formula missing: {formula}")
+    # The direct workflow owns the exact historical raw table shape/formulas.
+    require("CSV_HEADER_1" in analysis and "CSV_HEADER_2" in analysis, "CSV headers are not owned by Java")
+    for formula in ("=J", "=(K", "*0.28", "=LOG10(M", "=IF(AA"):
+        require(formula in analysis, f"Historical CSV formula missing: {formula}")
 
     # Fresh-Fiji validation must execute Java directly with the legacy macro physically absent.
     require("legacy/aNMJ-morph macro.txt" in runtime, "Direct runtime no longer removes/asserts legacy resource absence")

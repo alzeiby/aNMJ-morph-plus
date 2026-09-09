@@ -10,6 +10,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_BASELINE = Path(__file__).resolve().parent / "nmj1_numeric_baseline.json"
+HEADER_1 = "IMAGE DETAILS (frame size),,NMJ,THRESHOLD,PRE-SYNAPTIC,,,,Branch analysis,,,,,,,,,POST-SYNAPTIC"
+HEADER_2 = '"Number of pixels (eg, 512 x 512)","Metric (eg, 67.48 x 67.48um)","Ref number","(nerve terminal/motor endplate)","Number of Axonal Inputs","Axon Diameter (um)","Nerve Terminal Perimeter (um)","Nerve Terminal Area (um2)","Value 0 (background white pixels)","Value 2 (terminal pixels)","Value 4 (three-point branch pixels)","Value 5 (four-point branch pixels)"," Number of Terminal Branches","Number of Branch Points","Total Length of Branches (um)","Average Length of Branches (um)","""Complexity""","AChR Perimeter (um)","AChR Area (um2)","Endplate Diameter (um)","Endplate Perimeter (um)","Endplate Area (um2)","""Compactness"" (%)","Unoccupied AChR Area (um2)","""Area of Synaptic Contact"" (um2)","""Overlap"" (%)","Number of AChR Clusters","Average Area of AChR Clusters (um2)","""Fragmentation"""'
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -98,6 +100,9 @@ def validate_case(
     rows = list(csv.reader(text.splitlines()))
     if len(rows) != 2 + runs:
         raise AssertionError(f"Expected {2 + runs} CSV rows, found {len(rows)} in {csv_path}")
+    lines = text.splitlines()
+    if lines[0] != HEADER_1 or lines[1] != HEADER_2:
+        raise AssertionError(f"Historical CSV headers changed in {csv_path}")
 
     for offset, row in enumerate(rows[2:], start=3):
         if len(row) != 29:

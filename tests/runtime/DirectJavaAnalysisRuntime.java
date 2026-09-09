@@ -32,9 +32,6 @@ public final class DirectJavaAnalysisRuntime {
 
     private static final int RECT_WIDTH = 384;
     private static final int RECT_HEIGHT = 512;
-    private static final BatchChoiceResolver.ChannelChoice CHANNELS =
-        new BatchChoiceResolver.ChannelChoice(1, 2);
-
     private DirectJavaAnalysisRuntime() {
     }
 
@@ -121,13 +118,14 @@ public final class DirectJavaAnalysisRuntime {
     }
 
     private static void verifyChannelSelectionScience() {
-        verifySelectedChannels(3, new BatchChoiceResolver.ChannelChoice(3, 1), 33, 11);
-        verifySelectedChannels(10, new BatchChoiceResolver.ChannelChoice(10, 3), 11, 22);
+        verifySelectedChannels(3, 3, 1, 33, 11);
+        verifySelectedChannels(10, 10, 3, 11, 22);
     }
 
     private static void verifySelectedChannels(
         final int channelCount,
-        final BatchChoiceResolver.ChannelChoice choice,
+        final int muscleChannel,
+        final int nerveChannel,
         final int expectedMuscle,
         final int expectedNerve
     ) {
@@ -150,10 +148,10 @@ public final class DirectJavaAnalysisRuntime {
             final String expectedUnit = source.getCalibration().getUnit();
 
             final Method splitSelected = AnalysisWorkflow.class.getDeclaredMethod(
-                "splitSelected", ImagePlus.class, BatchChoiceResolver.ChannelChoice.class
+                "splitSelected", ImagePlus.class, int.class, int.class
             );
             splitSelected.setAccessible(true);
-            final Object channels = splitSelected.invoke(null, source, choice);
+            final Object channels = splitSelected.invoke(null, source, muscleChannel, nerveChannel);
             final Field muscleField = channels.getClass().getDeclaredField("muscle");
             final Field nerveField = channels.getClass().getDeclaredField("nerve");
             muscleField.setAccessible(true);
@@ -193,17 +191,8 @@ public final class DirectJavaAnalysisRuntime {
         final Set<Integer> existing = imageIds();
         try {
             IJ.resetEscape();
-            ImagePlus image = new ImageLoader().load(input);
-            final InputNormalization normalization = StructuralNormalizer.normalizationFor(image);
-            if (normalization == InputNormalization.REJECT_TIME_SERIES) {
-                throw new IllegalStateException("Unexpected T>1 input in direct runtime fixture");
-            }
-
-            final TwoPlaneInterpretation twoPlane =
-                normalization == InputNormalization.CHOOSE_TWO_PLANE_INTERPRETATION
-                    ? TwoPlaneInterpretation.CHANNELS
-                    : null;
-            final ImagePlus normalized = new StructuralNormalizer().normalize(image, twoPlane);
+            ImagePlus image = ANMJMorphCommand.load(input);
+            final ImagePlus normalized = ANMJMorphCommand.normalize(image, false);
             if (normalized != image) {
                 image.changes = false;
                 image.close();
@@ -218,12 +207,7 @@ public final class DirectJavaAnalysisRuntime {
             }
 
             final AnalysisWorkflow workflow = new AnalysisWorkflow(prompter);
-            workflow.analyze(
-                image,
-                input,
-                CHANNELS,
-                result -> new CsvOutputWriter().append(AnalysisOutputPaths.forInput(input).csv, result)
-            );
+            workflow.analyze(image, input, 1, 2);
         } finally {
             closeImagesCreatedAfter(existing);
         }
@@ -232,7 +216,7 @@ public final class DirectJavaAnalysisRuntime {
     private static void createRectangularFixture(final Path reference, final Path output) {
         final Set<Integer> existing = imageIds();
         try {
-            final ImagePlus source = new ImageLoader().load(reference);
+            final ImagePlus source = ANMJMorphCommand.load(reference);
             source.show();
             require(source.getWidth() >= RECT_WIDTH && source.getHeight() >= RECT_HEIGHT,
                 "Reference is too small for rectangular fixture");
