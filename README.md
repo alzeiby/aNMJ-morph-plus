@@ -32,7 +32,7 @@ Developers can also install a build directly with `mvn -Dscijava.app.directory=/
 
 The root `aNMJ-morph macro.txt` remains the canonical reference implementation during the Java migration.
 
-The Java layer now owns single-image selection, supported-format routing, loading, and structural preflight. TIFF inputs use ImageJ directly; the other supported formats use the pinned Bio-Formats API. Java passes the exact loaded/open image ID into the canonical macro, avoiding window-order assumptions. Batch traversal and all scientific transformations and measurements remain in the macro during this migration.
+The Java layer now owns single-image selection plus batch traversal/session orchestration, supported-format routing, loading, and structural preflight. TIFF inputs use ImageJ directly; the other supported formats use the pinned Bio-Formats API. Java passes the exact loaded/open image ID into the canonical macro, avoiding window-order assumptions. Scientific transformations and measurements remain in the macro during this migration.
 
 The macro expects Fiji's standard `StartupMacros.fiji.ijm` file in the Fiji macros directory.
 
@@ -50,9 +50,9 @@ Then:
 
 ### Batch mode
 
-Run **Analyze > Tools > aNMJ-morph+** with **no image open**, choose **Batch folder**, and select the directory. The workflow searches recursively, skips generated `cleaned_images` directories, and processes supported images one at a time.
+Run **Analyze > Tools > aNMJ-morph+** with **no image open**, choose **Batch folder**, and select the directory. Java searches recursively, skips generated `cleaned_images` directories, and processes supported images one at a time. Per-file status and failure reasons are checkpointed under `<batch folder>/.anmj-morph-plus/session-v1.tsv`, separate from `raw_data_table.csv`. Completed files are skipped on resume, while interrupted runs are reconciled against the CSV and cleaned TIFFs before any retry. A file error is recorded and the batch continues; cancelling an interactive step stops the batch without discarding completed checkpoint state.
 
-Batch mode remains interactive because channel selection, threshold review, and segmentation review still require user input.
+Batch mode remains interactive. Channel and ambiguous two-plane choices can be reused for later files with the same conservative input signature only when **Apply to remaining matching files** is explicitly selected. Threshold review, axon measurements/cleanup, and segmentation review are never remembered and still require user input for each image.
 
 Supported extensions:
 

@@ -12,7 +12,7 @@ Use a fresh Fiji installation that contains the dependencies required by aNMJ-mo
 .\tests\runtime\run_validation.ps1 -FijiRoot C:\path\to\fresh\Fiji
 ```
 
-By default the runner generates fresh harnesses from `aNMJ-morph macro.txt`, runs a small deterministic fixture/metadata matrix, runs `NMJ_1.lsm` twice, creates and runs a calibrated 384 x 512 two-channel TIFF twice, and validates:
+By default the runner generates fresh harnesses from `aNMJ-morph macro.txt`, runs a small deterministic fixture/metadata matrix, runs `NMJ_1.lsm` twice, creates and runs a calibrated 384 x 512 two-channel TIFF twice, and runs one additional `NMJ_1.lsm` workflow using the Java batch channel-argument bridge. It validates:
 
 - native `.tif` and `.tiff` opening with calibration preserved;
 - uppercase `.TIF` / `.TIFF` routing;
@@ -22,6 +22,7 @@ By default the runner generates fresh harnesses from `aNMJ-morph macro.txt`, run
 - both deterministic interpretations of ambiguous `C=1/Z=2/T=1` input;
 - explicit `T>1` rejection;
 - completion through stage 7;
+- batch-supplied channel choices bypass only the channel-selection prompt and preserve the pinned numerical result;
 - 29-column data rows;
 - row-specific spreadsheet formulas;
 - append behavior without duplicate headers or blank separator rows;

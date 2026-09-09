@@ -16,7 +16,11 @@ final class LegacyMacroRunner implements WorkflowRunner {
     }
 
     void run(final String argument) {
-        IJ.runMacro(loadMacro(), argument == null ? "" : argument);
+        runForResult(argument);
+    }
+
+    String runForResult(final String argument) {
+        return IJ.runMacro(loadMacro(), argument == null ? "" : argument);
     }
 
     static String loadMacro() {

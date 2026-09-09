@@ -40,6 +40,20 @@ function makeTiffFilename(prefix, title) {
   return prefix + title + ".tif";
 }
 
+function getJavaArgumentValue(key) {
+  if (javaArgument == "") {
+    return "";
+  }
+  parts = split(javaArgument, ";");
+  prefix = key + "=";
+  for (argumentIndex = 0; argumentIndex < parts.length; argumentIndex++) {
+    if (startsWith(parts[argumentIndex], prefix)) {
+      return substring(parts[argumentIndex], lengthOf(prefix));
+    }
+  }
+  return "";
+}
+
 function openImageFile(fileName) {
   lowerName = toLowerCase(fileName);
   if (endsWith(lowerName, ".tif") || endsWith(lowerName, ".tiff")) {
@@ -77,11 +91,18 @@ function normalizeChannels() {
   }
 
   if (numberOfChannels == 1 && slices == 2) {
-    Dialog.create("Two-plane image detected");
-    Dialog.addMessage("This image contains one channel and two planes. This can represent either a two-page Keyence channel export or a genuine two-plane Z stack. Choose how the two planes should be interpreted.");
-    Dialog.addChoice("Interpret as", newArray("Two channels (Keyence/two-page export)", "Z stack (maximum-project)"));
-    Dialog.show();
-    twoPlaneInterpretation = Dialog.getChoice();
+    suppliedTwoPlaneInterpretation = getJavaArgumentValue("two-plane");
+    if (suppliedTwoPlaneInterpretation == "channels") {
+      twoPlaneInterpretation = "Two channels (Keyence/two-page export)";
+    } else if (suppliedTwoPlaneInterpretation == "z-stack") {
+      twoPlaneInterpretation = "Z stack (maximum-project)";
+    } else {
+      Dialog.create("Two-plane image detected");
+      Dialog.addMessage("This image contains one channel and two planes. This can represent either a two-page Keyence channel export or a genuine two-plane Z stack. Choose how the two planes should be interpreted.");
+      Dialog.addChoice("Interpret as", newArray("Two channels (Keyence/two-page export)", "Z stack (maximum-project)"));
+      Dialog.show();
+      twoPlaneInterpretation = Dialog.getChoice();
+    }
 
     if (twoPlaneInterpretation == "Two channels (Keyence/two-page export)") {
       run("Properties...", "channels=2 slices=1 frames=1");
@@ -90,8 +111,9 @@ function normalizeChannels() {
 }
 
 javaArgument = getArgument();
-if (startsWith(javaArgument, "image-id=")) {
-  javaImageId = parseInt(substring(javaArgument, lengthOf("image-id=")));
+javaImageIdText = getJavaArgumentValue("image-id");
+if (javaImageIdText != "") {
+  javaImageId = parseInt(javaImageIdText);
   selectImage(javaImageId);
   processOpenImage(getTitle());
 } else if (javaArgument == "batch") {
@@ -188,28 +210,35 @@ function processOpenImage(fileName) {
   imageDimensionsMetric = "" + formatNumber(metricWidth) + " x " + formatNumber(metricHeight) + sizeUnit;
   printIfEnabled("Image dimensions (metric): " + imageDimensionsMetric);
 
-  Dialog.create("Welcome");
-  Dialog.addMessage("Welcome to 'aNMJ-morph' macro. \nSelect channel 1 that is currently displayed. \nSelect channel 2. \n-\nPress OK.");
-  for (i = 1; i <= numberOfChannels; i++) {
-    Dialog.addChoice("Channel " + i, newArray("Ignore", "Muscle endplate", "Nerve terminal"));
-  }
-  Dialog.show();
-
-  muscleEndplateChannel = -1;
-  nerveTerminalChannel = -1;
-  for (i = 1; i <= numberOfChannels; i++) {
-    choice = Dialog.getChoice();
-    if (choice == "Muscle endplate") {
-      if (muscleEndplateChannel != -1) {
-        exit("Error: More than one channel was selected as the muscle endplate channel");
-      }
-      muscleEndplateChannel = i;
+  suppliedMuscleChannel = getJavaArgumentValue("muscle-channel");
+  suppliedNerveChannel = getJavaArgumentValue("nerve-channel");
+  if (suppliedMuscleChannel != "" && suppliedNerveChannel != "") {
+    muscleEndplateChannel = parseInt(suppliedMuscleChannel);
+    nerveTerminalChannel = parseInt(suppliedNerveChannel);
+  } else {
+    Dialog.create("Welcome");
+    Dialog.addMessage("Welcome to 'aNMJ-morph' macro. \nSelect channel 1 that is currently displayed. \nSelect channel 2. \n-\nPress OK.");
+    for (i = 1; i <= numberOfChannels; i++) {
+      Dialog.addChoice("Channel " + i, newArray("Ignore", "Muscle endplate", "Nerve terminal"));
     }
-    if (choice == "Nerve terminal") {
-      if (nerveTerminalChannel != -1) {
-        exit("Error: More than one channel was selected as the nerve terminal channel");
+    Dialog.show();
+
+    muscleEndplateChannel = -1;
+    nerveTerminalChannel = -1;
+    for (i = 1; i <= numberOfChannels; i++) {
+      choice = Dialog.getChoice();
+      if (choice == "Muscle endplate") {
+        if (muscleEndplateChannel != -1) {
+          exit("Error: More than one channel was selected as the muscle endplate channel");
+        }
+        muscleEndplateChannel = i;
       }
-      nerveTerminalChannel = i;
+      if (choice == "Nerve terminal") {
+        if (nerveTerminalChannel != -1) {
+          exit("Error: More than one channel was selected as the nerve terminal channel");
+        }
+        nerveTerminalChannel = i;
+      }
     }
   }
   if (muscleEndplateChannel == -1) {
@@ -217,6 +246,11 @@ function processOpenImage(fileName) {
   }
   if (nerveTerminalChannel == -1) {
     exit("Error: No nerve terminal channel was selected");
+  }
+  if (muscleEndplateChannel < 1 || muscleEndplateChannel > numberOfChannels ||
+      nerveTerminalChannel < 1 || nerveTerminalChannel > numberOfChannels ||
+      muscleEndplateChannel == nerveTerminalChannel) {
+    exit("Error: Invalid muscle endplate/nerve terminal channel selection");
   }
 
   selectImage(originalImageId);
