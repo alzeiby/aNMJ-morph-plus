@@ -14,6 +14,25 @@ $PluginJar = (Resolve-Path -LiteralPath $PluginJar).Path
 $pluginsDir = Join-Path $FijiRoot 'plugins'
 $installedPlugin = Join-Path $pluginsDir ("anmj-morph-plus-runtime-smoke-" + [Guid]::NewGuid().ToString('N') + '.jar')
 
+function Get-PinnedFijiProcesses {
+    $prefix = $FijiRoot.TrimEnd('\\') + '\\'
+    @(Get-CimInstance Win32_Process | Where-Object {
+        $_.ExecutablePath -and $_.ExecutablePath.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)
+    })
+}
+
+function Wait-ForPinnedFijiProcessDrain {
+    $deadline = (Get-Date).AddSeconds(10)
+    do {
+        $running = @(Get-PinnedFijiProcesses)
+        if ($running.Count -eq 0) { return }
+        Start-Sleep -Milliseconds 200
+    } while ((Get-Date) -lt $deadline)
+    $running = @(Get-PinnedFijiProcesses)
+    $details = ($running | ForEach-Object { "$($_.ProcessId):$($_.Name)" }) -join ', '
+    throw "Java plugin smoke left pinned Fiji process(es) running: $details"
+}
+
 $java = Get-ChildItem (Join-Path $FijiRoot 'java\win64') -Recurse -Filter 'java.exe' |
     Select-Object -First 1
 $javac = Get-ChildItem (Join-Path $FijiRoot 'java\win64') -Recurse -Filter 'javac.exe' |
@@ -57,6 +76,7 @@ try {
     if (($output -join "`n") -notlike '*DONE java plugin smoke*') {
         throw "Java plugin smoke did not report completion:`n$($output -join "`n")"
     }
+    Wait-ForPinnedFijiProcessDrain
 } finally {
     if (Test-Path -LiteralPath $installedPlugin) {
         Remove-Item -LiteralPath $installedPlugin -Force
