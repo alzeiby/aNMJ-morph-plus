@@ -86,7 +86,7 @@ run("Quit");
 File.saveString("START\\n", testLog);
     openImageFile(testFile);
 File.append("STAGE 1 open image", testLog);
-javaArgument = "image-id=" + getImageID() + ";muscle-channel=1;nerve-channel=2";
+javaArgument = "image-id=" + getImageID() + ";muscle-channel=1;nerve-channel=2;channels-canonical=1";
 File.append("STAGE 1 Java channels supplied", testLog);
 processOpenImage(testFile);
 File.append("DONE stage 7", testLog);
@@ -132,6 +132,7 @@ run("Quit");
             welcome_pattern,
             '''  muscleEndplateChannel = 1;
   nerveTerminalChannel = 2;
+  channelsCanonical = false;
   File.append("STAGE 1 channels selected", testLog);
 ''',
             "Welcome/channel-selection dialog",
@@ -222,6 +223,7 @@ def check(macro: Path) -> None:
         )
         required = [
             "STAGE 1 channels selected",
+            "channelsCanonical = false;",
             'setAutoThreshold("Default dark")',
             "STAGE 6 segmentation accepted",
             "DONE stage 7",
@@ -237,7 +239,7 @@ def check(macro: Path) -> None:
         supplied_channels=True,
     )
     for marker in (
-        'javaArgument = "image-id=" + getImageID() + ";muscle-channel=1;nerve-channel=2";',
+        'javaArgument = "image-id=" + getImageID() + ";muscle-channel=1;nerve-channel=2;channels-canonical=1";',
         "STAGE 1 Java channels supplied",
         'suppliedMuscleChannel = getJavaArgumentValue("muscle-channel");',
         'setAutoThreshold("Default dark")',

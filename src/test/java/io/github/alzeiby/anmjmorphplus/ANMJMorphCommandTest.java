@@ -34,6 +34,7 @@ public class ANMJMorphCommandTest {
         assertTrue(macro.contains("function processOpenImage(fileName)"));
         assertTrue(macro.contains("javaArgument = getArgument();"));
         assertTrue(macro.contains("getJavaArgumentValue(\"muscle-channel\")"));
+        assertTrue(macro.contains(";channels-canonical=1;"));
         assertTrue(macro.contains("getJavaArgumentValue(\"two-plane\")"));
         assertTrue(macro.contains("selectImage(javaImageId);"));
         assertTrue(macro.contains("2/7 Threshold Nerve terminal."));

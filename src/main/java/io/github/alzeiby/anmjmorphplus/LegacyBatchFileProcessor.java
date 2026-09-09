@@ -99,6 +99,7 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
                 choices.resolveChannels(channelSignature, effectiveChannels);
 
             BatchChoiceResolver.ChannelChoice macroChannelChoice = channelChoice;
+            boolean channelsCanonical = false;
             if (effectiveChannels <= ChannelRoleCanonicalizer.IMAGEJ_ARRANGER_MAX_CHANNELS) {
                 final ImagePlus canonical = channelRoleCanonicalizer.canonicalize(image, channelChoice);
                 if (canonical != image) {
@@ -106,9 +107,10 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
                     imagePresenter.accept(image);
                 }
                 macroChannelChoice = new BatchChoiceResolver.ChannelChoice(1, 2);
+                channelsCanonical = image.getNChannels() == 2 && image.isComposite();
             }
 
-            final String argument = buildMacroArgument(image, macroChannelChoice);
+            final String argument = buildMacroArgument(image, macroChannelChoice, channelsCanonical);
             final String result;
             try {
                 result = macroRunner.apply(argument);
@@ -125,12 +127,16 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
 
     static String buildMacroArgument(
         final ImagePlus image,
-        final BatchChoiceResolver.ChannelChoice channelChoice
+        final BatchChoiceResolver.ChannelChoice channelChoice,
+        final boolean channelsCanonical
     ) {
         final StringBuilder argument = new StringBuilder()
             .append("image-id=").append(image.getID())
             .append(";muscle-channel=").append(channelChoice.muscleEndplateChannel())
             .append(";nerve-channel=").append(channelChoice.nerveTerminalChannel());
+        if (channelsCanonical) {
+            argument.append(";channels-canonical=1");
+        }
         return argument.toString();
     }
 

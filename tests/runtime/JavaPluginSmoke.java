@@ -208,6 +208,7 @@ public final class JavaPluginSmoke {
         canonicalize.setAccessible(true);
         final Object threeOne = channelChoiceConstructor.newInstance(3, 1);
         final Object twoOne = channelChoiceConstructor.newInstance(2, 1);
+        final Object oneTwo = channelChoiceConstructor.newInstance(1, 2);
 
         final ImageStack stack = new ImageStack(1, 1);
         addByteSlice(stack, 11);
@@ -343,6 +344,31 @@ public final class JavaPluginSmoke {
         require(swappedTwoPlane.getNSlices() == 1, "Two-plane CHANNELS canonicalization retained Z planes");
         require(swappedTwoPlane.getStack().getProcessor(1).get(0, 0) == 29, "Two-plane CHANNELS swap C1 wrong");
         require(swappedTwoPlane.getStack().getProcessor(2).get(0, 0) == 13, "Two-plane CHANNELS swap C2 wrong");
+
+        final Class<?> processorClass = Class.forName(
+            "io.github.alzeiby.anmjmorphplus.LegacyBatchFileProcessor"
+        );
+        final Method buildMacroArgument = processorClass.getDeclaredMethod(
+            "buildMacroArgument",
+            ImagePlus.class,
+            channelChoiceClass,
+            boolean.class
+        );
+        buildMacroArgument.setAccessible(true);
+        final ImagePlus plainTwoChannel = twoPlane(7, 19);
+        plainTwoChannel.setDimensions(2, 1, 1);
+        require(!plainTwoChannel.isComposite(), "Plain two-channel smoke fixture unexpectedly composite");
+        final String plainArgument = (String) buildMacroArgument.invoke(null, plainTwoChannel, oneTwo, false);
+        require(
+            !plainArgument.contains("channels-canonical="),
+            "Plain two-channel bridge unexpectedly skipped legacy Arrange"
+        );
+        require(!interpreted.isComposite(), "C1/Z2 CHANNELS fixture unexpectedly composite");
+        final String twoPlaneArgument = (String) buildMacroArgument.invoke(null, interpreted, oneTwo, false);
+        require(
+            !twoPlaneArgument.contains("channels-canonical="),
+            "C1/Z2 CHANNELS bridge unexpectedly skipped legacy Arrange"
+        );
     }
 
     private static void smokeBatchProjectionBridge() throws Exception {
@@ -520,6 +546,10 @@ public final class JavaPluginSmoke {
                 macroArgument.get().contains("muscle-channel=1") &&
                     macroArgument.get().contains("nerve-channel=2"),
                 "Batch macro did not receive canonical channel roles"
+            );
+            require(
+                macroArgument.get().contains("channels-canonical=1"),
+                "Batch macro did not receive canonical-channel shadow flag"
             );
             require(!sentinelClosed.get(), "Batch cleanup closed a pre-existing sentinel image");
             final Path checkpoint = root.resolve(".anmj-morph-plus").resolve("session-v1.tsv");

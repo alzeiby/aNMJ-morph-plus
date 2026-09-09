@@ -5,7 +5,7 @@
     "sha256": "b60dcedcd7509183e61a5301110f114fdaf366348f8297cae96608d6c902e0c2"
   },
   "macro": {
-    "normalized_sha256": "df9d3e5420709f1a846314b66a4cdafdf5bd63c994a8db5fe1dcb394fa537fd4",
+    "normalized_sha256": "491051c2fd01fcfc660394805bf1bf5f93ace749c724c7d7d1a50f952cebe9a5",
     "oracle_output_commit": "756cbeb4f7d27026e6e03f35b542e81d4fdba2ee",
     "current_macro_commit_when_pinned": "29c8075e9f60e37790ea8fd388cc9770c286178b"
   },
