@@ -23,9 +23,9 @@ public class BatchChoiceResolverTest {
         final AtomicInteger planePrompts = new AtomicInteger();
         final BatchChoiceResolver.Prompter prompter = new BatchChoiceResolver.Prompter() {
             @Override
-            public BatchChoiceResolver.PromptResult<BatchChoiceResolver.TwoPlaneChoice> promptTwoPlane(final InputSignature signature) {
+            public BatchChoiceResolver.PromptResult<TwoPlaneInterpretation> promptTwoPlane(final InputSignature signature) {
                 planePrompts.incrementAndGet();
-                return new BatchChoiceResolver.PromptResult<>(BatchChoiceResolver.TwoPlaneChoice.CHANNELS, true);
+                return new BatchChoiceResolver.PromptResult<>(TwoPlaneInterpretation.CHANNELS, true);
             }
 
             @Override
@@ -61,7 +61,7 @@ public class BatchChoiceResolverTest {
         final BatchCheckpointStore.Session reloaded = store.load(root);
         final BatchChoiceResolver reloadedResolver = new BatchChoiceResolver(root, store, reloaded, new FailingPrompter());
         assertEquals(1, reloadedResolver.resolveChannels(channelSignature, 2).muscleEndplateChannel());
-        assertEquals(BatchChoiceResolver.TwoPlaneChoice.CHANNELS, reloadedResolver.resolveTwoPlane(planeSignature));
+        assertEquals(TwoPlaneInterpretation.CHANNELS, reloadedResolver.resolveTwoPlane(planeSignature));
     }
 
     @Test
@@ -75,7 +75,7 @@ public class BatchChoiceResolverTest {
             store.load(root),
             new BatchChoiceResolver.Prompter() {
                 @Override
-                public BatchChoiceResolver.PromptResult<BatchChoiceResolver.TwoPlaneChoice> promptTwoPlane(final InputSignature signature) {
+                public BatchChoiceResolver.PromptResult<TwoPlaneInterpretation> promptTwoPlane(final InputSignature signature) {
                     throw new AssertionError("not used");
                 }
 
@@ -104,7 +104,7 @@ public class BatchChoiceResolverTest {
             store.load(root),
             new BatchChoiceResolver.Prompter() {
                 @Override
-                public BatchChoiceResolver.PromptResult<BatchChoiceResolver.TwoPlaneChoice> promptTwoPlane(final InputSignature signature) {
+                public BatchChoiceResolver.PromptResult<TwoPlaneInterpretation> promptTwoPlane(final InputSignature signature) {
                     throw new AssertionError("not used");
                 }
 
@@ -124,7 +124,7 @@ public class BatchChoiceResolverTest {
 
     private static final class FailingPrompter implements BatchChoiceResolver.Prompter {
         @Override
-        public BatchChoiceResolver.PromptResult<BatchChoiceResolver.TwoPlaneChoice> promptTwoPlane(final InputSignature signature) {
+        public BatchChoiceResolver.PromptResult<TwoPlaneInterpretation> promptTwoPlane(final InputSignature signature) {
             throw new AssertionError("remembered two-plane choice should be reused");
         }
 
