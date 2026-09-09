@@ -23,7 +23,15 @@ def replace_once(text: str, pattern: re.Pattern[str], replacement: str, label: s
     return text
 
 
-def make_harness(source: str, image_path: Path, log_path: Path, rectangular: bool) -> str:
+def make_harness(
+    source: str,
+    image_path: Path,
+    log_path: Path,
+    rectangular: bool,
+    supplied_channels: bool = False,
+) -> str:
+    if rectangular and supplied_channels:
+        raise ValueError("supplied-channel bridge harness is only defined for the square reference case")
     marker = "decimalPlaces = 8;"
     if marker not in source:
         raise RuntimeError("Could not locate decimalPlaces configuration marker")
@@ -73,6 +81,19 @@ run("Close All");
 run("Quit");
 
 '''
+    elif supplied_channels:
+        dispatch = f'''testFile = "{image}";
+File.saveString("START\\n", testLog);
+    openImageFile(testFile);
+File.append("STAGE 1 open image", testLog);
+javaArgument = "image-id=" + getImageID() + ";muscle-channel=1;nerve-channel=2";
+File.append("STAGE 1 Java channels supplied", testLog);
+processOpenImage(testFile);
+File.append("DONE stage 7", testLog);
+run("Close All");
+run("Quit");
+
+'''
     else:
         dispatch = f'''testFile = "{image}";
 File.saveString("START\\n", testLog);
@@ -102,15 +123,19 @@ run("Quit");
             r'exit\("Error: No nerve terminal channel was selected"\);\s*\}\s*',
             re.DOTALL,
         )
-    text = replace_once(
-        text,
-        welcome_pattern,
-        '''  muscleEndplateChannel = 1;
+    if supplied_channels:
+        if 'suppliedMuscleChannel = getJavaArgumentValue("muscle-channel");' not in text:
+            raise RuntimeError("Production macro does not expose the Java channel-argument bridge")
+    else:
+        text = replace_once(
+            text,
+            welcome_pattern,
+            '''  muscleEndplateChannel = 1;
   nerveTerminalChannel = 2;
   File.append("STAGE 1 channels selected", testLog);
 ''',
-        "Welcome/channel-selection dialog",
-    )
+            "Welcome/channel-selection dialog",
+        )
 
     threshold_command = 'run("Threshold...");'
     threshold_count = text.count(threshold_command)
@@ -137,22 +162,25 @@ run("Quit");
     return text
 
 
-def build(macro: Path, reference: Path, work: Path) -> tuple[Path, Path]:
+def build(macro: Path, reference: Path, work: Path) -> tuple[Path, Path, Path]:
     source = macro.read_text(encoding="utf-8")
     if not reference.exists():
         raise FileNotFoundError(reference)
 
     square_dir = work / "square"
     rect_dir = work / "rectangular"
-    for directory in (square_dir, rect_dir):
+    bridge_dir = work / "java-bridge"
+    for directory in (square_dir, rect_dir, bridge_dir):
         if directory.exists():
             shutil.rmtree(directory)
         (directory / "input").mkdir(parents=True)
 
     square_image = square_dir / "input" / "NMJ_1.lsm"
     rect_source = rect_dir / "input" / "NMJ_1.lsm"
+    bridge_image = bridge_dir / "input" / "NMJ_1.lsm"
     shutil.copy2(reference, square_image)
     shutil.copy2(reference, rect_source)
+    shutil.copy2(reference, bridge_image)
 
     square_harness = square_dir / "aNMJ-morph-plus-e2e.ijm"
     square_harness.write_text(
@@ -167,7 +195,19 @@ def build(macro: Path, reference: Path, work: Path) -> tuple[Path, Path]:
         encoding="utf-8",
         newline="\n",
     )
-    return square_harness, rect_harness
+    bridge_harness = bridge_dir / "aNMJ-morph-plus-java-bridge-e2e.ijm"
+    bridge_harness.write_text(
+        make_harness(
+            source,
+            bridge_image,
+            bridge_dir / "trace.txt",
+            rectangular=False,
+            supplied_channels=True,
+        ),
+        encoding="utf-8",
+        newline="\n",
+    )
+    return square_harness, rect_harness, bridge_harness
 
 
 def check(macro: Path) -> None:
@@ -189,6 +229,23 @@ def check(macro: Path) -> None:
         for marker in required:
             if marker not in harness:
                 raise AssertionError(f"Generated harness is missing {marker!r}")
+    bridge = make_harness(
+        source,
+        placeholder,
+        ROOT / "tests" / "runtime" / "_work" / "trace.txt",
+        rectangular=False,
+        supplied_channels=True,
+    )
+    for marker in (
+        'javaArgument = "image-id=" + getImageID() + ";muscle-channel=1;nerve-channel=2";',
+        "STAGE 1 Java channels supplied",
+        'suppliedMuscleChannel = getJavaArgumentValue("muscle-channel");',
+        'setAutoThreshold("Default dark")',
+        "STAGE 6 segmentation accepted",
+        "DONE stage 7",
+    ):
+        if marker not in bridge:
+            raise AssertionError(f"Generated Java-bridge harness is missing {marker!r}")
     print("Runtime harness generation check passed")
 
 
@@ -204,9 +261,10 @@ def main() -> None:
         check(args.macro)
         return
 
-    square, rectangular = build(args.macro, args.reference, args.work_dir)
+    square, rectangular, bridge = build(args.macro, args.reference, args.work_dir)
     print(square)
     print(rectangular)
+    print(bridge)
 
 
 if __name__ == "__main__":

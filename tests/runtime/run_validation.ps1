@@ -95,6 +95,8 @@ $squareHarness = Join-Path $workDir 'square\aNMJ-morph-plus-e2e.ijm'
 $squareTrace = Join-Path $workDir 'square\trace.txt'
 $rectHarness = Join-Path $workDir 'rectangular\aNMJ-morph-plus-rect-e2e.ijm'
 $rectTrace = Join-Path $workDir 'rectangular\trace.txt'
+$bridgeHarness = Join-Path $workDir 'java-bridge\aNMJ-morph-plus-java-bridge-e2e.ijm'
+$bridgeTrace = Join-Path $workDir 'java-bridge\trace.txt'
 
 Run-Harness $fixtureHarness $fixtureTrace "fixture metadata probe" "DONE fixtures"
 & python $fixtureValidator --trace $fixtureTrace
@@ -106,8 +108,9 @@ for ($i = 1; $i -le $Runs; $i++) {
 for ($i = 1; $i -le $Runs; $i++) {
     Run-Harness $rectHarness $rectTrace "rectangular run $i" "DONE stage 7"
 }
+Run-Harness $bridgeHarness $bridgeTrace "Java batch-argument bridge run" "DONE stage 7"
 
 & python $validator --work-dir $workDir --runs $Runs
 if ($LASTEXITCODE -ne 0) { throw 'Runtime output validation failed' }
 
-Write-Output "aNMJ-morph+ fresh-Fiji runtime validation passed (fixture matrix + $Runs square + $Runs rectangular runs)."
+Write-Output "aNMJ-morph+ fresh-Fiji runtime validation passed (fixture matrix + $Runs square + $Runs rectangular + Java batch-argument bridge run)."

@@ -160,7 +160,14 @@ def main() -> None:
         "NMJ_1_rect_384x512.tif",
         args.runs,
     )
-    print("Runtime outputs passed CSV, append, formula, numerical-oracle, NaN, and cleaned-image checks")
+    validate_case(
+        args.work_dir / "java-bridge",
+        "512 x 512",
+        "NMJ_1.lsm",
+        1,
+        numerical_baseline=baseline,
+    )
+    print("Runtime outputs passed CSV, append, formula, numerical-oracle, Java-bridge, NaN, and cleaned-image checks")
 
 
 if __name__ == "__main__":
