@@ -82,7 +82,15 @@ def main() -> None:
 
     # The primary, threshold template, and segmentation copy must use the same channel ordering.
     arrange_call = 'run("Arrange Channels...", "new=" + muscleEndplateChannel + \'\' + nerveTerminalChannel);'
-    require(MACRO.count(arrange_call) >= 3, "Channel ordering is not applied consistently to all analysis copies")
+    require(MACRO.count(arrange_call) == 3, "Expected exactly three legacy channel-ordering calls")
+    require(
+        'channelsCanonical = indexOf(";" + javaArgument + ";", ";channels-canonical=1;") >= 0;' in MACRO,
+        "Java canonical-channel bridge flag is not parsed",
+    )
+    require(
+        MACRO.count("if (!channelsCanonical) {") == 3,
+        "All three legacy channel-ordering calls must be skipped only for Java-canonical batch input",
+    )
 
     # Batch processing must support TIFF rather than excluding it globally.
     require('endsWith(lowerName, ".tif")' in MACRO, "TIFF is not included in supported batch formats")

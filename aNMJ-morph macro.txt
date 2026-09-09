@@ -212,6 +212,7 @@ function processOpenImage(fileName) {
 
   suppliedMuscleChannel = getJavaArgumentValue("muscle-channel");
   suppliedNerveChannel = getJavaArgumentValue("nerve-channel");
+  channelsCanonical = indexOf(";" + javaArgument + ";", ";channels-canonical=1;") >= 0;
   if (suppliedMuscleChannel != "" && suppliedNerveChannel != "") {
     muscleEndplateChannel = parseInt(suppliedMuscleChannel);
     nerveTerminalChannel = parseInt(suppliedNerveChannel);
@@ -254,7 +255,9 @@ function processOpenImage(fileName) {
   }
 
   selectImage(originalImageId);
-  run("Arrange Channels...", "new=" + muscleEndplateChannel + '' + nerveTerminalChannel);
+  if (!channelsCanonical) {
+    run("Arrange Channels...", "new=" + muscleEndplateChannel + '' + nerveTerminalChannel);
+  }
   selectImage(originalImageId);
   Stack.setChannel(1);
   run("Split Channels");
@@ -265,7 +268,9 @@ function processOpenImage(fileName) {
   run("Duplicate...", "title=[" + templateTitle + "] duplicate");
   templateImageId = getImageID();
   selectImage(templateImageId);
-  run("Arrange Channels...", "new=" + muscleEndplateChannel + '' + nerveTerminalChannel);
+  if (!channelsCanonical) {
+    run("Arrange Channels...", "new=" + muscleEndplateChannel + '' + nerveTerminalChannel);
+  }
   selectImage(templateImageId);
   Stack.setChannel(1);
   run("Split Channels");
@@ -421,7 +426,9 @@ function processOpenImage(fileName) {
   run("Duplicate...", "title=[" + segmentCopyTitle + "] duplicate");
   segmentImageId = getImageID();
   selectImage(segmentImageId);
-  run("Arrange Channels...", "new=" + muscleEndplateChannel + '' + nerveTerminalChannel);
+  if (!channelsCanonical) {
+    run("Arrange Channels...", "new=" + muscleEndplateChannel + '' + nerveTerminalChannel);
+  }
   selectImage(segmentImageId);
   Stack.setChannel(1);
 

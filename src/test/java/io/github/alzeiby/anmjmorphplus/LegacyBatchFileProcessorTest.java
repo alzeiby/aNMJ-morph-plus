@@ -66,6 +66,7 @@ public class LegacyBatchFileProcessorTest {
 
         assertTrue(argument.get().contains("muscle-channel=1"));
         assertTrue(argument.get().contains("nerve-channel=2"));
+        assertTrue(argument.get().contains("channels-canonical=1"));
         assertFalse(argument.get().contains("two-plane="));
     }
 
@@ -106,6 +107,7 @@ public class LegacyBatchFileProcessorTest {
         assertTrue(canonical != source);
         assertEquals(1, closes.get());
         assertTrue(source.getID() != canonical.getID());
+        assertTrue(canonical.isComposite());
         assertEquals(2, canonical.getNChannels());
         assertEquals(33, canonical.getStack().getProcessor(1).get(0, 0));
         assertEquals(11, canonical.getStack().getProcessor(2).get(0, 0));
@@ -114,6 +116,7 @@ public class LegacyBatchFileProcessorTest {
         assertTrue(argument.get().contains("image-id=" + canonical.getID()));
         assertTrue(argument.get().contains("muscle-channel=1"));
         assertTrue(argument.get().contains("nerve-channel=2"));
+        assertTrue(argument.get().contains("channels-canonical=1"));
         assertFalse(argument.get().contains("muscle-channel=3"));
     }
 
@@ -138,11 +141,37 @@ public class LegacyBatchFileProcessorTest {
 
         assertEquals(2, presented.size());
         final ImagePlus canonical = presented.get(1);
+        assertTrue(canonical.isComposite());
         assertEquals(19, canonical.getStack().getProcessor(1).get(0, 0));
         assertEquals(7, canonical.getStack().getProcessor(2).get(0, 0));
         assertTrue(argument.get().contains("image-id=" + canonical.getID()));
         assertTrue(argument.get().contains("muscle-channel=1"));
         assertTrue(argument.get().contains("nerve-channel=2"));
+        assertTrue(argument.get().contains("channels-canonical=1"));
+    }
+
+    @Test
+    public void alreadyCanonicalPlainTwoChannelBatchKeepsLegacyArrangeCompatibilityStep() throws Exception {
+        final ImageStack stack = new ImageStack(1, 1);
+        stack.addSlice(new ByteProcessor(1, 1, new byte[] {7}, null));
+        stack.addSlice(new ByteProcessor(1, 1, new byte[] {19}, null));
+        final ImagePlus image = new ImagePlus("canonical.tif", stack);
+        image.setDimensions(2, 1, 1);
+        image.setOpenAsHyperStack(true);
+        assertFalse(image.isComposite());
+        final AtomicReference<String> argument = new AtomicReference<>();
+        final LegacyBatchFileProcessor processor = new LegacyBatchFileProcessor(
+            path -> image,
+            ignored -> { },
+            value -> { argument.set(value); return null; },
+            new StructuralNormalizer()
+        );
+
+        processor.process(Path.of("canonical.tif"), resolver(1, 2));
+
+        assertTrue(argument.get().contains("muscle-channel=1"));
+        assertTrue(argument.get().contains("nerve-channel=2"));
+        assertFalse(argument.get().contains("channels-canonical="));
     }
 
     @Test
@@ -182,6 +211,8 @@ public class LegacyBatchFileProcessorTest {
         assertFalse(argument.get().contains("two-plane="));
         assertTrue(argument.get().contains("muscle-channel=1"));
         assertTrue(argument.get().contains("nerve-channel=2"));
+        assertFalse(image.isComposite());
+        assertFalse(argument.get().contains("channels-canonical="));
     }
 
     @Test
@@ -215,6 +246,7 @@ public class LegacyBatchFileProcessorTest {
         assertTrue(argument.get().contains("image-id=" + canonical.getID()));
         assertTrue(argument.get().contains("muscle-channel=1"));
         assertTrue(argument.get().contains("nerve-channel=2"));
+        assertTrue(argument.get().contains("channels-canonical=1"));
     }
 
     @Test
@@ -292,6 +324,7 @@ public class LegacyBatchFileProcessorTest {
         assertTrue(argument.get().contains("image-id=" + normalized.getID()));
         assertTrue(argument.get().contains("muscle-channel=1"));
         assertTrue(argument.get().contains("nerve-channel=2"));
+        assertTrue(argument.get().contains("channels-canonical=1"));
         assertFalse(argument.get().contains("two-plane="));
     }
 
@@ -338,6 +371,7 @@ public class LegacyBatchFileProcessorTest {
         assertEquals("z.lsm", normalized.getOriginalFileInfo().fileName);
         assertEquals("C:\\source data\\", normalized.getOriginalFileInfo().directory);
         assertTrue(argument.get().contains("image-id=" + normalized.getID()));
+        assertTrue(argument.get().contains("channels-canonical=1"));
     }
 
     @Test
@@ -386,6 +420,7 @@ public class LegacyBatchFileProcessorTest {
 
         assertTrue(argument.get().contains("muscle-channel=1"));
         assertTrue(argument.get().contains("nerve-channel=2"));
+        assertTrue(argument.get().contains("channels-canonical=1"));
         final InputSignature signature = InputSignature.of(
             SupportedImageFormat.TIFF,
             new ImageShape(1, 1, 3, 1, 1, 8),
@@ -421,6 +456,7 @@ public class LegacyBatchFileProcessorTest {
         assertEquals(10, image.getNChannels());
         assertTrue(argument.get().contains("muscle-channel=3"));
         assertTrue(argument.get().contains("nerve-channel=1"));
+        assertFalse(argument.get().contains("channels-canonical="));
     }
 
     @Test
