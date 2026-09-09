@@ -50,7 +50,7 @@ Then:
 
 ### Batch mode
 
-Run **Analyze > Tools > aNMJ-morph+** with **no image open**, choose **Batch folder**, and select the directory. Java searches recursively, skips generated `cleaned_images` directories, and processes supported images one at a time. Per-file status and failure reasons are checkpointed under `<batch folder>/.anmj-morph-plus/session-v1.tsv`, separate from `raw_data_table.csv`. Completed files are skipped on resume, while interrupted runs are reconciled against the CSV and cleaned TIFFs before any retry.
+Run **Analyze > Tools > aNMJ-morph+** with **no image open**, choose **Batch folder**, and select the directory. Java searches recursively, skips generated `cleaned_images` directories, and processes supported images one at a time. Per-file status and failure reasons are checkpointed under `<batch folder>/.anmj-morph-plus/session-v1.tsv`, separate from `raw_data_table.csv`. Completed files are skipped on resume, while interrupted runs are reconciled against the CSV and cleaned TIFFs before any retry. A file error is recorded and the batch continues; cancelling an interactive step stops the batch without discarding completed checkpoint state.
 
 Batch mode remains interactive. Channel and ambiguous two-plane choices can be reused for later files with the same conservative input signature only when **Apply to remaining matching files** is explicitly selected. Threshold review, axon measurements/cleanup, and segmentation review are never remembered and still require user input for each image.
 

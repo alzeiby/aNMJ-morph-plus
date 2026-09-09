@@ -27,6 +27,7 @@ public class BatchSessionRunnerTest {
         touch(root.resolve("A file.lsm"));
         touch(root.resolve("notes.txt"));
         touch(root.resolve("nested").resolve("c.png"));
+        touch(root.resolve("source_cleaned_images.tif"));
         touch(root.resolve("nested").resolve("cleaned_images").resolve("ignored.tif"));
         touch(root.resolve("some_cleaned_images_backup").resolve("ignored2.tif"));
         touch(root.resolve(BatchCheckpointStore.SESSION_DIRECTORY).resolve("ignored.tif"));
@@ -37,7 +38,34 @@ public class BatchSessionRunnerTest {
             names.add(BatchCheckpointStore.relativePath(root, path));
         }
 
-        assertEquals(List.of("A file.lsm", "b.TIFF", "nested/c.png"), names);
+        assertEquals(List.of("A file.lsm", "b.TIFF", "nested/c.png", "source_cleaned_images.tif"), names);
+    }
+
+    @Test
+    public void userCancellationStopsTheSessionBeforeLaterFiles() throws Exception {
+        final Path root = temporaryFolder.newFolder("cancel").toPath();
+        final Path first = touch(root.resolve("a.tif"));
+        final Path second = touch(root.resolve("b.tif"));
+        touch(root.resolve("c.tif"));
+        final BatchCheckpointStore store = new BatchCheckpointStore();
+        final List<String> processed = new ArrayList<>();
+
+        runner(root, store, (path, choices) -> {
+            processed.add(path.getFileName().toString());
+            if (path.equals(first)) {
+                commitOutputs(path);
+            } else if (path.equals(second)) {
+                throw BatchFileException.cancelled("synthetic cancel");
+            } else {
+                throw new AssertionError("files after cancellation must not run");
+            }
+        }).run();
+
+        assertEquals(List.of("a.tif", "b.tif"), processed);
+        final BatchCheckpointStore.Session session = store.load(root);
+        assertEquals(BatchCheckpointStore.Status.SUCCEEDED, session.files.get("a.tif").status);
+        assertEquals(BatchCheckpointStore.Status.CANCELLED, session.files.get("b.tif").status);
+        assertFalse(session.files.containsKey("c.tif"));
     }
 
     @Test

@@ -22,6 +22,8 @@ final class InputSignature {
         final String suffix = interpretation == null ? "" : "|interpretation=" + interpretation;
         return new InputSignature(
             "format=" + format.name() +
+            "|w=" + shape.width() +
+            "|h=" + shape.height() +
             "|c=" + shape.channels() +
             "|z=" + shape.slices() +
             "|t=" + shape.frames() +

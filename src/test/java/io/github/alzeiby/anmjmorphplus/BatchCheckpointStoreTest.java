@@ -5,6 +5,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.nio.file.Path;
+import java.nio.file.AtomicMoveNotSupportedException;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -46,5 +47,30 @@ public class BatchCheckpointStoreTest {
         final BatchCheckpointStore.Session loaded = new BatchCheckpointStore().load(root);
         assertTrue(loaded.files.isEmpty());
         assertTrue(loaded.choices.isEmpty());
+    }
+
+    @Test
+    public void unsupportedAtomicReplacementFailsWithoutReplacingExistingCheckpoint() throws Exception {
+        final Path root = temporaryFolder.newFolder("atomic").toPath();
+        final BatchCheckpointStore workingStore = new BatchCheckpointStore();
+        final BatchCheckpointStore.Session original = new BatchCheckpointStore.Session();
+        original.choices.put("channels|original", "1,2");
+        workingStore.save(root, original);
+
+        final BatchCheckpointStore failingStore = new BatchCheckpointStore((source, target) -> {
+            throw new AtomicMoveNotSupportedException(source.toString(), target.toString(), "synthetic");
+        });
+        final BatchCheckpointStore.Session replacement = new BatchCheckpointStore.Session();
+        replacement.choices.put("channels|replacement", "2,1");
+
+        final BatchCheckpointStore.BatchCheckpointException error = org.junit.Assert.assertThrows(
+            BatchCheckpointStore.BatchCheckpointException.class,
+            () -> failingStore.save(root, replacement)
+        );
+
+        assertTrue(error.getMessage().contains("Atomic checkpoint replacement is not supported"));
+        final BatchCheckpointStore.Session reloaded = workingStore.load(root);
+        assertEquals("1,2", reloaded.choices.get("channels|original"));
+        assertFalse(reloaded.choices.containsKey("channels|replacement"));
     }
 }

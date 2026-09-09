@@ -9,11 +9,32 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 final class BatchCheckpointStore {
 
+    @FunctionalInterface
+    interface AtomicMover {
+        void move(Path source, Path target) throws IOException;
+    }
+
     static final String SESSION_DIRECTORY = ".anmj-morph-plus";
     static final String SESSION_FILE = "session-v1.tsv";
+
+    private final AtomicMover atomicMover;
+
+    BatchCheckpointStore() {
+        this((source, target) -> Files.move(
+            source,
+            target,
+            StandardCopyOption.ATOMIC_MOVE,
+            StandardCopyOption.REPLACE_EXISTING
+        ));
+    }
+
+    BatchCheckpointStore(final AtomicMover atomicMover) {
+        this.atomicMover = Objects.requireNonNull(atomicMover, "atomicMover");
+    }
 
     enum Status {
         PENDING,
@@ -124,16 +145,12 @@ final class BatchCheckpointStore {
                     writer.newLine();
                 }
             }
-            try {
-                Files.move(
-                    temporary,
-                    checkpoint,
-                    StandardCopyOption.ATOMIC_MOVE,
-                    StandardCopyOption.REPLACE_EXISTING
-                );
-            } catch (AtomicMoveNotSupportedException e) {
-                Files.move(temporary, checkpoint, StandardCopyOption.REPLACE_EXISTING);
-            }
+            atomicMover.move(temporary, checkpoint);
+        } catch (AtomicMoveNotSupportedException e) {
+            throw new BatchCheckpointException(
+                "Atomic checkpoint replacement is not supported by this filesystem: " + checkpoint,
+                e
+            );
         } catch (IOException e) {
             throw new BatchCheckpointException("Could not write batch checkpoint: " + checkpoint, e);
         }

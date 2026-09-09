@@ -88,12 +88,14 @@ final class BatchSessionRunner implements WorkflowRunner {
         final Set<String> collisions = outputStemCollisions(root, files);
 
         for (Path file : files) {
-            processOne(root, file, collisions, session, choices);
+            if (!processOne(root, file, collisions, session, choices)) {
+                break;
+            }
         }
         reportSummary(session);
     }
 
-    private void processOne(
+    private boolean processOne(
         final Path root,
         final Path file,
         final Set<String> collisions,
@@ -112,7 +114,7 @@ final class BatchSessionRunner implements WorkflowRunner {
                 mark(record, BatchCheckpointStore.Status.NEEDS_REVIEW, "INPUT_CHANGED",
                     "Input changed after a prior committed or ambiguous run");
                 checkpointStore.save(root, session);
-                return;
+                return true;
             }
             record = new BatchCheckpointStore.FileRecord(
                 relative,
@@ -138,11 +140,11 @@ final class BatchSessionRunner implements WorkflowRunner {
                     "A previously successful file no longer has its committed CSV/output artifacts");
                 checkpointStore.save(root, session);
             }
-            return;
+            return true;
         }
 
         if (record.status == BatchCheckpointStore.Status.NEEDS_REVIEW) {
-            return;
+            return true;
         }
 
         if (record.status == BatchCheckpointStore.Status.RUNNING) {
@@ -150,13 +152,13 @@ final class BatchSessionRunner implements WorkflowRunner {
             if (recovered == OutputState.COMMITTED) {
                 mark(record, BatchCheckpointStore.Status.SUCCEEDED, "", "Recovered committed output after interruption");
                 checkpointStore.save(root, session);
-                return;
+                return true;
             }
             if (recovered == OutputState.AMBIGUOUS) {
                 mark(record, BatchCheckpointStore.Status.NEEDS_REVIEW, "OUTPUT_STATE_AMBIGUOUS",
                     "Interrupted run left an ambiguous CSV/cleaned-output state");
                 checkpointStore.save(root, session);
-                return;
+                return true;
             }
             record.status = BatchCheckpointStore.Status.PENDING;
         }
@@ -165,20 +167,21 @@ final class BatchSessionRunner implements WorkflowRunner {
             mark(record, BatchCheckpointStore.Status.FAILED_PRECHECK, "OUTPUT_NAME_COLLISION",
                 "Another input in this directory produces the same cleaned-image filenames");
             checkpointStore.save(root, session);
-            return;
+            return true;
         }
 
         if (hasAnyCleanedOutput(file)) {
             mark(record, BatchCheckpointStore.Status.NEEDS_REVIEW, "PREEXISTING_OUTPUTS",
                 "Cleaned outputs already exist without a successful checkpoint record");
             checkpointStore.save(root, session);
-            return;
+            return true;
         }
 
         record.csvLinesBefore = countCsvLines(csvPath(file));
         mark(record, BatchCheckpointStore.Status.RUNNING, "", "");
         checkpointStore.save(root, session);
 
+        boolean stopSession = false;
         try {
             fileProcessor.process(file, choices);
             final OutputState output = outputState(file, record.csvLinesBefore);
@@ -202,6 +205,7 @@ final class BatchSessionRunner implements WorkflowRunner {
                 mark(record, BatchCheckpointStore.Status.FAILED_PRECHECK, e.reasonCode(), e.getMessage());
             } else if (e.kind() == BatchFileException.Kind.CANCELLED) {
                 mark(record, BatchCheckpointStore.Status.CANCELLED, e.reasonCode(), e.getMessage());
+                stopSession = true;
             } else {
                 mark(record, BatchCheckpointStore.Status.FAILED_RUNTIME, e.reasonCode(), e.getMessage());
             }
@@ -215,6 +219,7 @@ final class BatchSessionRunner implements WorkflowRunner {
             }
         }
         checkpointStore.save(root, session);
+        return !stopSession;
     }
 
     static List<Path> discover(final Path root) {
@@ -236,7 +241,11 @@ final class BatchSessionRunner implements WorkflowRunner {
 
     private static boolean isExcluded(final Path root, final Path file) {
         final Path relative = root.relativize(file);
-        for (Path component : relative) {
+        final Path parent = relative.getParent();
+        if (parent == null) {
+            return false;
+        }
+        for (Path component : parent) {
             final String name = component.toString().toLowerCase(Locale.ROOT);
             if (name.contains("cleaned_images") || name.equals(BatchCheckpointStore.SESSION_DIRECTORY)) {
                 return true;

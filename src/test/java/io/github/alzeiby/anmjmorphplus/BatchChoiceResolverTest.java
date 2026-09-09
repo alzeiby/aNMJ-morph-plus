@@ -93,6 +93,35 @@ public class BatchChoiceResolverTest {
         assertEquals(2, prompts.get());
     }
 
+    @Test
+    public void differentImageDimensionsDoNotShareRememberedChannels() throws Exception {
+        final Path root = temporaryFolder.newFolder("dimensions").toPath();
+        final BatchCheckpointStore store = new BatchCheckpointStore();
+        final AtomicInteger prompts = new AtomicInteger();
+        final BatchChoiceResolver resolver = new BatchChoiceResolver(
+            root,
+            store,
+            store.load(root),
+            new BatchChoiceResolver.Prompter() {
+                @Override
+                public BatchChoiceResolver.PromptResult<BatchChoiceResolver.TwoPlaneChoice> promptTwoPlane(final InputSignature signature) {
+                    throw new AssertionError("not used");
+                }
+
+                @Override
+                public BatchChoiceResolver.PromptResult<BatchChoiceResolver.ChannelChoice> promptChannels(final InputSignature signature, final int channelCount) {
+                    prompts.incrementAndGet();
+                    return new BatchChoiceResolver.PromptResult<>(new BatchChoiceResolver.ChannelChoice(1, 2), true);
+                }
+            }
+        );
+
+        resolver.resolveChannels(InputSignature.of(SupportedImageFormat.TIFF, new ImageShape(16, 12, 2, 1, 1, 8), InputNormalization.USE_AS_IS, null), 2);
+        resolver.resolveChannels(InputSignature.of(SupportedImageFormat.TIFF, new ImageShape(32, 12, 2, 1, 1, 8), InputNormalization.USE_AS_IS, null), 2);
+
+        assertEquals(2, prompts.get());
+    }
+
     private static final class FailingPrompter implements BatchChoiceResolver.Prompter {
         @Override
         public BatchChoiceResolver.PromptResult<BatchChoiceResolver.TwoPlaneChoice> promptTwoPlane(final InputSignature signature) {
