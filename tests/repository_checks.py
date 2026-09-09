@@ -4,6 +4,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MACRO_PATH = ROOT / "aNMJ-morph macro.txt"
 MACRO = MACRO_PATH.read_text(encoding="utf-8")
+RUNTIME_VALIDATION_PATH = ROOT / "tests" / "runtime" / "run_validation.ps1"
+RUNTIME_VALIDATION = RUNTIME_VALIDATION_PATH.read_text(encoding="utf-8")
 
 
 def require(condition: bool, message: str) -> None:
@@ -63,6 +65,23 @@ def check_balanced_delimiters(text: str) -> None:
 def main() -> None:
     require(MACRO_PATH.exists(), "Macro file is missing")
     check_balanced_delimiters(MACRO)
+
+    # fiji.bat is only a launcher wrapper; its exit must not end trace polling
+    # before the Fiji child has reached the requested completion marker.
+    require(
+        "$process.Refresh()\n        if ($process.HasExited) { break }" not in RUNTIME_VALIDATION,
+        "Runtime validation must not stop polling when the Fiji launcher wrapper exits",
+    )
+    require(
+        "while ((Get-Date) -lt $deadline)" in RUNTIME_VALIDATION
+        and 'if ($traceText -like "*$CompletionMarker*")' in RUNTIME_VALIDATION,
+        "Runtime validation must remain completion-marker/deadline driven",
+    )
+    require(
+        "Start-Process -FilePath $fijiLauncher" in RUNTIME_VALIDATION
+        and "-PassThru -WindowStyle Hidden" in RUNTIME_VALIDATION,
+        "Runtime validation must continue launching Fiji through the hidden wrapper",
+    )
 
     # Rectangular-image calculation must use width * height, not the original square assumption.
     require(
