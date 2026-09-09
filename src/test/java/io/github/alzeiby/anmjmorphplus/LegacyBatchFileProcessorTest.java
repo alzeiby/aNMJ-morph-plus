@@ -40,7 +40,8 @@ public class LegacyBatchFileProcessorTest {
             ignored -> presented.set(true),
             argument -> { macroRan.set(true); return null; },
             new StructuralNormalizer(),
-            LegacyBatchFileProcessorTest::duplicateForProcessorTest
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest,
+            LegacyBatchFileProcessorTest::duplicateTemplateForProcessorTest
         );
 
         final BatchFileException error = assertThrows(
@@ -63,7 +64,8 @@ public class LegacyBatchFileProcessorTest {
             ignored -> { },
             value -> { argument.set(value); return null; },
             new StructuralNormalizer(),
-            LegacyBatchFileProcessorTest::duplicateForProcessorTest
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest,
+            LegacyBatchFileProcessorTest::duplicateTemplateForProcessorTest
         );
 
         processor.process(Path.of("sample.tif"), resolver());
@@ -72,6 +74,7 @@ public class LegacyBatchFileProcessorTest {
         assertTrue(argument.get().contains("nerve-channel=2"));
         assertTrue(argument.get().contains("channels-canonical=1"));
         assertTrue(argument.get().contains("source-copy-id="));
+        assertTrue(argument.get().contains("template-copy-id="));
         assertFalse(argument.get().contains("two-plane="));
     }
 
@@ -102,7 +105,8 @@ public class LegacyBatchFileProcessorTest {
             presented::add,
             value -> { argument.set(value); return null; },
             new StructuralNormalizer(),
-            LegacyBatchFileProcessorTest::duplicateForProcessorTest
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest,
+            LegacyBatchFileProcessorTest::duplicateTemplateForProcessorTest
         );
 
         processor.process(Path.of("three.tif"), resolver(3, 1));
@@ -141,7 +145,8 @@ public class LegacyBatchFileProcessorTest {
             presented::add,
             value -> { argument.set(value); return null; },
             new StructuralNormalizer(),
-            LegacyBatchFileProcessorTest::duplicateForProcessorTest
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest,
+            LegacyBatchFileProcessorTest::duplicateTemplateForProcessorTest
         );
 
         processor.process(Path.of("swap.tif"), resolver(2, 1));
@@ -172,7 +177,8 @@ public class LegacyBatchFileProcessorTest {
             ignored -> { },
             value -> { argument.set(value); return null; },
             new StructuralNormalizer(),
-            LegacyBatchFileProcessorTest::duplicateForProcessorTest
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest,
+            LegacyBatchFileProcessorTest::duplicateTemplateForProcessorTest
         );
 
         processor.process(Path.of("canonical.tif"), resolver(1, 2));
@@ -190,7 +196,8 @@ public class LegacyBatchFileProcessorTest {
             ignored -> { },
             argument -> "[aborted]",
             new StructuralNormalizer(),
-            LegacyBatchFileProcessorTest::duplicateForProcessorTest
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest,
+            LegacyBatchFileProcessorTest::duplicateTemplateForProcessorTest
         );
 
         final BatchFileException error = assertThrows(
@@ -215,6 +222,7 @@ public class LegacyBatchFileProcessorTest {
         };
         final ImagePlus image = IJ.createHyperStack("abort.tif", 2, 1, 2, 1, 1, 8);
         final AtomicReference<Integer> sourceCopyId = new AtomicReference<>();
+        final AtomicReference<Integer> templateCopyId = new AtomicReference<>();
         Interpreter.batchMode = true;
         Interpreter.addBatchModeImage(sentinel);
         try {
@@ -223,8 +231,11 @@ public class LegacyBatchFileProcessorTest {
                 Interpreter::addBatchModeImage,
                 argument -> {
                     final int id = Integer.parseInt(argumentValue(argument, "source-copy-id"));
+                    final int templateId = Integer.parseInt(argumentValue(argument, "template-copy-id"));
                     sourceCopyId.set(id);
+                    templateCopyId.set(templateId);
                     assertTrue(WindowManager.getImage(id) != null);
+                    assertTrue(WindowManager.getImage(templateId) != null);
                     return "[aborted]";
                 },
                 new StructuralNormalizer()
@@ -237,7 +248,9 @@ public class LegacyBatchFileProcessorTest {
 
             assertEquals("USER_CANCELLED", error.reasonCode());
             assertTrue(sourceCopyId.get() != null);
+            assertTrue(templateCopyId.get() != null);
             assertNull(WindowManager.getImage(sourceCopyId.get()));
+            assertNull(WindowManager.getImage(templateCopyId.get()));
             assertEquals(0, sentinelCloses.get());
             assertTrue(batchImageRegistered(sentinel.getID()));
         } finally {
@@ -260,6 +273,7 @@ public class LegacyBatchFileProcessorTest {
         };
         final ImagePlus image = IJ.createHyperStack("error.tif", 2, 1, 2, 1, 1, 8);
         final AtomicReference<Integer> sourceCopyId = new AtomicReference<>();
+        final AtomicReference<Integer> templateCopyId = new AtomicReference<>();
         Interpreter.batchMode = true;
         Interpreter.addBatchModeImage(sentinel);
         try {
@@ -268,8 +282,11 @@ public class LegacyBatchFileProcessorTest {
                 Interpreter::addBatchModeImage,
                 argument -> {
                     final int id = Integer.parseInt(argumentValue(argument, "source-copy-id"));
+                    final int templateId = Integer.parseInt(argumentValue(argument, "template-copy-id"));
                     sourceCopyId.set(id);
+                    templateCopyId.set(templateId);
                     assertTrue(WindowManager.getImage(id) != null);
+                    assertTrue(WindowManager.getImage(templateId) != null);
                     throw new IllegalStateException("synthetic macro failure");
                 },
                 new StructuralNormalizer()
@@ -282,7 +299,9 @@ public class LegacyBatchFileProcessorTest {
 
             assertEquals("MACRO_ERROR", error.reasonCode());
             assertTrue(sourceCopyId.get() != null);
+            assertTrue(templateCopyId.get() != null);
             assertNull(WindowManager.getImage(sourceCopyId.get()));
+            assertNull(WindowManager.getImage(templateCopyId.get()));
             assertEquals(0, sentinelCloses.get());
             assertTrue(batchImageRegistered(sentinel.getID()));
         } finally {
@@ -301,7 +320,8 @@ public class LegacyBatchFileProcessorTest {
             ignored -> { },
             value -> { argument.set(value); return null; },
             new StructuralNormalizer(),
-            LegacyBatchFileProcessorTest::duplicateForProcessorTest
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest,
+            LegacyBatchFileProcessorTest::duplicateTemplateForProcessorTest
         );
 
         processor.process(Path.of("two-plane.tif"), resolver());
@@ -330,7 +350,8 @@ public class LegacyBatchFileProcessorTest {
             presented::add,
             value -> { argument.set(value); return null; },
             new StructuralNormalizer(),
-            LegacyBatchFileProcessorTest::duplicateForProcessorTest
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest,
+            LegacyBatchFileProcessorTest::duplicateTemplateForProcessorTest
         );
 
         processor.process(
@@ -372,7 +393,8 @@ public class LegacyBatchFileProcessorTest {
             presented::add,
             argument -> { macroRan.set(true); return null; },
             new StructuralNormalizer(),
-            LegacyBatchFileProcessorTest::duplicateForProcessorTest
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest,
+            LegacyBatchFileProcessorTest::duplicateTemplateForProcessorTest
         );
 
         final BatchFileException error = assertThrows(
@@ -412,7 +434,8 @@ public class LegacyBatchFileProcessorTest {
             presented::set,
             value -> { argument.set(value); return null; },
             new StructuralNormalizer(),
-            LegacyBatchFileProcessorTest::duplicateForProcessorTest
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest,
+            LegacyBatchFileProcessorTest::duplicateTemplateForProcessorTest
         );
 
         processor.process(Path.of("rgb.png"), resolver());
@@ -459,7 +482,8 @@ public class LegacyBatchFileProcessorTest {
             presented::set,
             value -> { argument.set(value); return null; },
             new StructuralNormalizer(),
-            LegacyBatchFileProcessorTest::duplicateForProcessorTest
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest,
+            LegacyBatchFileProcessorTest::duplicateTemplateForProcessorTest
         );
 
         processor.process(Path.of("z.lsm"), resolver());
@@ -518,7 +542,8 @@ public class LegacyBatchFileProcessorTest {
             ignored -> { },
             value -> { argument.set(value); return null; },
             new StructuralNormalizer(),
-            LegacyBatchFileProcessorTest::duplicateForProcessorTest
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest,
+            LegacyBatchFileProcessorTest::duplicateTemplateForProcessorTest
         );
 
         processor.process(Path.of("remember.tif"), resolver);
@@ -552,7 +577,8 @@ public class LegacyBatchFileProcessorTest {
             presented::add,
             value -> { argument.set(value); return null; },
             new StructuralNormalizer(),
-            LegacyBatchFileProcessorTest::duplicateForProcessorTest
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest,
+            LegacyBatchFileProcessorTest::duplicateTemplateForProcessorTest
         );
 
         processor.process(Path.of("ten.tif"), resolver(3, 1));
@@ -591,7 +617,8 @@ public class LegacyBatchFileProcessorTest {
                 ignored -> { },
                 argument -> null,
                 new StructuralNormalizer(),
-                LegacyBatchFileProcessorTest::duplicateForProcessorTest
+                LegacyBatchFileProcessorTest::duplicateForProcessorTest,
+                LegacyBatchFileProcessorTest::duplicateTemplateForProcessorTest
             );
 
             processor.process(Path.of("sample.tif"), resolver(3, 1));
@@ -618,6 +645,12 @@ public class LegacyBatchFileProcessorTest {
     private static ImagePlus duplicateForProcessorTest(final ImagePlus source) {
         final ImagePlus copy = source.duplicate();
         copy.setTitle("__aNMJ_source_" + source.getID());
+        return copy;
+    }
+
+    private static ImagePlus duplicateTemplateForProcessorTest(final ImagePlus sourceCopy) {
+        final ImagePlus copy = sourceCopy.duplicate();
+        copy.setTitle("__aNMJ_template_" + sourceCopy.getID());
         return copy;
     }
 

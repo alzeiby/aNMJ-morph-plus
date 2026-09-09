@@ -141,6 +141,48 @@ run("Quit");
 ''' + source_copy_complete,
             1,
         )
+        template_copy_title = '  templateTitle = "__aNMJ_template_" + sourceCopyId;'
+        if template_copy_title not in text:
+            raise RuntimeError("Production macro does not expose the template-copy stage")
+        text = text.replace(
+            template_copy_title,
+            template_copy_title + '''
+  run("Duplicate...", "title=[" + templateTitle + "] duplicate");
+  javaSuppliedTemplateCopyId = getImageID();
+  selectImage(sourceCopyId);
+  javaArgument = javaArgument + ";template-copy-id=" + javaSuppliedTemplateCopyId;
+  if (indexOf(javaArgument, ";source-copy-id=" + javaSuppliedSourceCopyId) < 0 ||
+      indexOf(javaArgument, ";template-copy-id=" + javaSuppliedTemplateCopyId) < 0) {
+    exit("Error: Java bridge argument scope lost before template-copy handoff");
+  }
+  File.append("STAGE 2 Java template copy argument preserved", testLog);
+  File.append("STAGE 2 Java template copy supplied", testLog);''',
+            1,
+        )
+        template_fallback = '    run("Duplicate...", "title=[" + templateTitle + "] duplicate");'
+        if text.count(template_fallback) != 1:
+            raise RuntimeError("Production macro template-copy fallback changed")
+        text = text.replace(
+            template_fallback,
+            '''    File.append("ERROR Java template bridge entered legacy fallback", testLog);
+    exit("Error: Java template bridge entered legacy fallback");
+''' + template_fallback,
+            1,
+        )
+        template_copy_select = '''  selectImage(templateImageId);
+  if (!channelsCanonical) {'''
+        if text.count(template_copy_select) != 1:
+            raise RuntimeError("Production macro template-copy selection boundary changed")
+        text = text.replace(
+            template_copy_select,
+            '''  selectImage(templateImageId);
+  if (templateImageId != javaSuppliedTemplateCopyId) {
+    exit("Error: Java template-copy bridge was not adopted");
+  }
+  File.append("STAGE 2 Java template copy accepted", testLog);
+  if (!channelsCanonical) {''',
+            1,
+        )
 
     if 'suppliedMuscleChannel = getJavaArgumentValue("muscle-channel");' in text:
         welcome_pattern = re.compile(
@@ -282,6 +324,11 @@ def check(macro: Path) -> None:
         "STAGE 1 Java source copy argument preserved",
         "STAGE 1 Java source copy supplied",
         "STAGE 1 Java source copy accepted",
+        'javaArgument = javaArgument + ";template-copy-id=" + javaSuppliedTemplateCopyId;',
+        "STAGE 2 Java template copy argument preserved",
+        "STAGE 2 Java template copy supplied",
+        "STAGE 2 Java template copy accepted",
+        "ERROR Java template bridge entered legacy fallback",
         'suppliedMuscleChannel = getJavaArgumentValue("muscle-channel");',
         'setAutoThreshold("Default dark")',
         "STAGE 6 segmentation accepted",
@@ -291,6 +338,8 @@ def check(macro: Path) -> None:
             raise AssertionError(f"Generated Java-bridge harness is missing {marker!r}")
     if "0;source-copy-id=" in bridge:
         raise AssertionError("Generated Java-bridge harness regressed to local 0;source-copy-id argument scope")
+    if "0;template-copy-id=" in bridge:
+        raise AssertionError("Generated Java-bridge harness regressed to local 0;template-copy-id argument scope")
     print("Runtime harness generation check passed")
 
 

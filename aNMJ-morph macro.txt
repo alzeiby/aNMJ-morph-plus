@@ -292,8 +292,34 @@ function processOpenImage(fileName) {
 
   selectImage(sourceCopyId);
   templateTitle = "__aNMJ_template_" + sourceCopyId;
-  run("Duplicate...", "title=[" + templateTitle + "] duplicate");
-  templateImageId = getImageID();
+  templateCopyIdText = "";
+  templateCopyArguments = ";" + javaArgument + ";";
+  templateCopyPrefix = ";template-copy-id=";
+  templateCopyStart = indexOf(templateCopyArguments, templateCopyPrefix);
+  if (templateCopyStart >= 0) {
+    templateCopyStart = templateCopyStart + lengthOf(templateCopyPrefix);
+    templateCopyTail = substring(templateCopyArguments, templateCopyStart);
+    templateCopyEnd = indexOf(templateCopyTail, ";");
+    if (templateCopyEnd >= 0) {
+      templateCopyIdText = substring(templateCopyTail, 0, templateCopyEnd);
+    }
+    if (templateCopyIdText == "") {
+      exit("Error: Invalid template-copy-id supplied by Java");
+    }
+    suppliedTemplateCopyId = parseInt(templateCopyIdText);
+    if (isNaN(suppliedTemplateCopyId) || templateCopyIdText != "" + suppliedTemplateCopyId || !isOpen(suppliedTemplateCopyId)) {
+      exit("Error: Invalid template-copy-id supplied by Java");
+    }
+    selectImage(suppliedTemplateCopyId);
+    if (getTitle() != templateTitle) {
+      selectImage(sourceCopyId);
+      exit("Error: Invalid template-copy-id supplied by Java");
+    }
+    templateImageId = suppliedTemplateCopyId;
+  } else {
+    run("Duplicate...", "title=[" + templateTitle + "] duplicate");
+    templateImageId = getImageID();
+  }
   selectImage(templateImageId);
   if (!channelsCanonical) {
     run("Arrange Channels...", "new=" + muscleEndplateChannel + '' + nerveTerminalChannel);

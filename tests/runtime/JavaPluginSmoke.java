@@ -360,13 +360,14 @@ public final class JavaPluginSmoke {
             ImagePlus.class,
             channelChoiceClass,
             boolean.class,
+            int.class,
             int.class
         );
         buildMacroArgument.setAccessible(true);
         final ImagePlus plainTwoChannel = twoPlane(7, 19);
         plainTwoChannel.setDimensions(2, 1, 1);
         require(!plainTwoChannel.isComposite(), "Plain two-channel smoke fixture unexpectedly composite");
-        final String plainArgument = (String) buildMacroArgument.invoke(null, plainTwoChannel, oneTwo, false, -12345);
+        final String plainArgument = (String) buildMacroArgument.invoke(null, plainTwoChannel, oneTwo, false, -12345, -12346);
         require(
             !plainArgument.contains("channels-canonical="),
             "Plain two-channel bridge unexpectedly skipped legacy Arrange"
@@ -375,8 +376,12 @@ public final class JavaPluginSmoke {
             plainArgument.contains("source-copy-id=-12345"),
             "Plain two-channel bridge omitted source-copy ID"
         );
+        require(
+            plainArgument.contains("template-copy-id=-12346"),
+            "Plain two-channel bridge omitted template-copy ID"
+        );
         require(!interpreted.isComposite(), "C1/Z2 CHANNELS fixture unexpectedly composite");
-        final String twoPlaneArgument = (String) buildMacroArgument.invoke(null, interpreted, oneTwo, false, -23456);
+        final String twoPlaneArgument = (String) buildMacroArgument.invoke(null, interpreted, oneTwo, false, -23456, -23457);
         require(
             !twoPlaneArgument.contains("channels-canonical="),
             "C1/Z2 CHANNELS bridge unexpectedly skipped legacy Arrange"
@@ -384,6 +389,10 @@ public final class JavaPluginSmoke {
         require(
             twoPlaneArgument.contains("source-copy-id=-23456"),
             "C1/Z2 CHANNELS bridge omitted source-copy ID"
+        );
+        require(
+            twoPlaneArgument.contains("template-copy-id=-23457"),
+            "C1/Z2 CHANNELS bridge omitted template-copy ID"
         );
     }
 
@@ -504,6 +513,7 @@ public final class JavaPluginSmoke {
         final AtomicReference<ImagePlus> presented = new AtomicReference<>();
         final AtomicReference<String> macroArgument = new AtomicReference<>();
         final AtomicReference<Integer> sourceCopyId = new AtomicReference<>();
+        final AtomicReference<Integer> templateCopyId = new AtomicReference<>();
         final Function<Path, ImagePlus> loader = ignored -> source;
         final Consumer<ImagePlus> presenter = image -> {
             presented.set(image);
@@ -537,6 +547,27 @@ public final class JavaPluginSmoke {
             require(
                 sourceCopy.getStack().getProcessor(1).get(0, 0) == current.getStack().getProcessor(1).get(0, 0),
                 "Batch source-copy pixels differ before macro handoff"
+            );
+            final String templateCopyText = argumentValue(argument, "template-copy-id");
+            require(templateCopyText != null, "Batch macro argument omitted template-copy ID");
+            final int templateId = Integer.parseInt(templateCopyText);
+            templateCopyId.set(templateId);
+            final ImagePlus templateCopy = WindowManager.getImage(templateId);
+            require(templateCopy != null, "Batch template-copy ID does not resolve while macro is running");
+            require(
+                ("__aNMJ_template_" + sourceCopy.getID()).equals(templateCopy.getTitle()),
+                "Batch template-copy title does not match source-copy ID"
+            );
+            require(templateCopy.getID() != sourceCopy.getID(), "Batch template copy reused source-copy ID");
+            require(
+                templateCopy.getNChannels() == sourceCopy.getNChannels() &&
+                    templateCopy.getNSlices() == sourceCopy.getNSlices() &&
+                    templateCopy.getNFrames() == sourceCopy.getNFrames(),
+                "Batch template-copy dimensions changed before macro handoff"
+            );
+            require(
+                templateCopy.getStack().getProcessor(1).get(0, 0) == sourceCopy.getStack().getProcessor(1).get(0, 0),
+                "Batch template-copy pixels differ before macro handoff"
             );
             return null;
         };
@@ -592,6 +623,10 @@ public final class JavaPluginSmoke {
             require(
                 sourceCopyId.get() != null && WindowManager.getImage(sourceCopyId.get()) == null,
                 "Batch source copy was not cleaned up after macro handoff"
+            );
+            require(
+                templateCopyId.get() != null && WindowManager.getImage(templateCopyId.get()) == null,
+                "Batch template copy was not cleaned up after macro handoff"
             );
             require(!sentinelClosed.get(), "Batch cleanup closed a pre-existing sentinel image");
             final Path checkpoint = root.resolve(".anmj-morph-plus").resolve("session-v1.tsv");

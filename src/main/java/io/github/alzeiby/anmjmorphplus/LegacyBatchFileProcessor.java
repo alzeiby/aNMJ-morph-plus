@@ -18,6 +18,7 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
     private final StructuralNormalizer structuralNormalizer;
     private final ChannelRoleCanonicalizer channelRoleCanonicalizer;
     private final Function<ImagePlus, ImagePlus> sourceCopyDuplicator;
+    private final Function<ImagePlus, ImagePlus> templateCopyDuplicator;
 
     LegacyBatchFileProcessor() {
         final ImageLoader loader = new ImageLoader();
@@ -28,6 +29,7 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
         this.structuralNormalizer = new StructuralNormalizer();
         this.channelRoleCanonicalizer = new ChannelRoleCanonicalizer();
         this.sourceCopyDuplicator = new SourceCopyDuplicator()::duplicate;
+        this.templateCopyDuplicator = new TemplateCopyDuplicator()::duplicate;
     }
 
     LegacyBatchFileProcessor(
@@ -41,7 +43,8 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
             imagePresenter,
             macroRunner,
             structuralNormalizer,
-            new SourceCopyDuplicator()::duplicate
+            new SourceCopyDuplicator()::duplicate,
+            new TemplateCopyDuplicator()::duplicate
         );
     }
 
@@ -50,7 +53,8 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
         final Consumer<ImagePlus> imagePresenter,
         final Function<String, String> macroRunner,
         final StructuralNormalizer structuralNormalizer,
-        final Function<ImagePlus, ImagePlus> sourceCopyDuplicator
+        final Function<ImagePlus, ImagePlus> sourceCopyDuplicator,
+        final Function<ImagePlus, ImagePlus> templateCopyDuplicator
     ) {
         this.imageLoader = Objects.requireNonNull(imageLoader, "imageLoader");
         this.imagePresenter = Objects.requireNonNull(imagePresenter, "imagePresenter");
@@ -58,6 +62,7 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
         this.structuralNormalizer = Objects.requireNonNull(structuralNormalizer, "structuralNormalizer");
         this.channelRoleCanonicalizer = new ChannelRoleCanonicalizer();
         this.sourceCopyDuplicator = Objects.requireNonNull(sourceCopyDuplicator, "sourceCopyDuplicator");
+        this.templateCopyDuplicator = Objects.requireNonNull(templateCopyDuplicator, "templateCopyDuplicator");
     }
 
     @Override
@@ -138,11 +143,21 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
             } catch (RuntimeException e) {
                 throw BatchFileException.runtime("SOURCE_COPY_FAILED", messageOrClass(e), e);
             }
+            final ImagePlus templateCopy;
+            try {
+                templateCopy = Objects.requireNonNull(
+                    templateCopyDuplicator.apply(sourceCopy),
+                    "templateCopyDuplicator returned null"
+                );
+            } catch (RuntimeException e) {
+                throw BatchFileException.runtime("TEMPLATE_COPY_FAILED", messageOrClass(e), e);
+            }
             final String argument = buildMacroArgument(
                 image,
                 macroChannelChoice,
                 channelsCanonical,
-                sourceCopy.getID()
+                sourceCopy.getID(),
+                templateCopy.getID()
             );
             final String result;
             try {
@@ -162,13 +177,15 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
         final ImagePlus image,
         final BatchChoiceResolver.ChannelChoice channelChoice,
         final boolean channelsCanonical,
-        final int sourceCopyId
+        final int sourceCopyId,
+        final int templateCopyId
     ) {
         final StringBuilder argument = new StringBuilder()
             .append("image-id=").append(image.getID())
             .append(";muscle-channel=").append(channelChoice.muscleEndplateChannel())
             .append(";nerve-channel=").append(channelChoice.nerveTerminalChannel())
-            .append(";source-copy-id=").append(sourceCopyId);
+            .append(";source-copy-id=").append(sourceCopyId)
+            .append(";template-copy-id=").append(templateCopyId);
         if (channelsCanonical) {
             argument.append(";channels-canonical=1");
         }
