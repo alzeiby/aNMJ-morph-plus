@@ -29,11 +29,6 @@ final class AnalysisOutputPaths {
             throw new IllegalArgumentException("Input image has no parent directory: " + input);
         }
         final Path cleaned = parent.resolve("cleaned_images");
-        try {
-            Files.createDirectories(cleaned);
-        } catch (IOException e) {
-            throw new IllegalStateException("Could not create cleaned_images directory: " + cleaned, e);
-        }
         final String name = absolute.getFileName().toString();
         final int dot = name.lastIndexOf('.');
         final String stem = dot > 0 ? name.substring(0, dot) : name;
@@ -43,5 +38,17 @@ final class AnalysisOutputPaths {
             cleaned.resolve("muscle_endplate" + stem + ".tif"),
             cleaned.resolve("muscle_intermediate_endplate" + stem + ".tif")
         );
+    }
+
+    void ensureCleanedDirectory() {
+        try {
+            Files.createDirectories(axon.getParent());
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not create cleaned_images directory: " + axon.getParent(), e);
+        }
+    }
+
+    Path[] cleanedOutputs() {
+        return new Path[] {axon, endplate, endplateIntermediate};
     }
 }

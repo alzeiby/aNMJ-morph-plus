@@ -20,16 +20,16 @@ final class ChannelRoleCanonicalizer {
             return image;
         }
         if (image.getNChannels() == 2 &&
-            channelChoice.muscleEndplateChannel() == 1 &&
-            channelChoice.nerveTerminalChannel() == 2) {
+            channelChoice.muscleEndplateChannel == 1 &&
+            channelChoice.nerveTerminalChannel == 2) {
             return image;
         }
 
         final ImagePlus canonical = ChannelArranger.run(
             image,
             new int[] {
-                channelChoice.muscleEndplateChannel(),
-                channelChoice.nerveTerminalChannel()
+                channelChoice.muscleEndplateChannel,
+                channelChoice.nerveTerminalChannel
             }
         );
         if (canonical == null) {

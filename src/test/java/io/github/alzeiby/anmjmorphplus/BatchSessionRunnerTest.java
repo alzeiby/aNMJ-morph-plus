@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -245,7 +246,7 @@ public class BatchSessionRunnerTest {
     private static BatchSessionRunner runner(
         final Path root,
         final BatchCheckpointStore store,
-        final BatchSessionRunner.FileProcessor processor
+        final BiConsumer<Path, BatchChoiceResolver> processor
     ) {
         return new BatchSessionRunner(
             () -> root,
@@ -253,12 +254,12 @@ public class BatchSessionRunnerTest {
             processor,
             new BatchChoiceResolver.Prompter() {
                 @Override
-                public BatchChoiceResolver.PromptResult<TwoPlaneInterpretation> promptTwoPlane(final InputSignature signature) {
+                public BatchChoiceResolver.PromptResult<TwoPlaneInterpretation> promptTwoPlane(final String signature) {
                     throw new AssertionError("fake processor should not prompt");
                 }
 
                 @Override
-                public BatchChoiceResolver.PromptResult<BatchChoiceResolver.ChannelChoice> promptChannels(final InputSignature signature, final int channelCount) {
+                public BatchChoiceResolver.PromptResult<BatchChoiceResolver.ChannelChoice> promptChannels(final String signature, final int channelCount) {
                     throw new AssertionError("fake processor should not prompt");
                 }
             },

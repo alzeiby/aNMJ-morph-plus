@@ -11,7 +11,7 @@ final class StructuralNormalizer {
 
     ImagePlus normalize(final ImagePlus image, final TwoPlaneInterpretation twoPlaneInterpretation) {
         Objects.requireNonNull(image, "image");
-        final InputNormalization normalization = InputPolicy.normalizationFor(ImageShape.from(image));
+        final InputNormalization normalization = InputPolicy.normalizationFor(image);
         switch (normalization) {
             case USE_AS_IS:
                 return image;

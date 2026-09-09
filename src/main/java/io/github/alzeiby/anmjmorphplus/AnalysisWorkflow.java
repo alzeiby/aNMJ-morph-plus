@@ -49,6 +49,7 @@ final class AnalysisWorkflow {
         final boolean channelsCanonical
     ) {
         final AnalysisOutputPaths paths = AnalysisOutputPaths.forInput(inputPath);
+        paths.ensureCleanedDirectory();
         final int width = image.getWidth();
         final int height = image.getHeight();
         final double pixelSizeX = image.getCalibration().pixelWidth;
@@ -244,7 +245,7 @@ final class AnalysisWorkflow {
         ImagePlus selected = source;
         if (!channelsCanonical) {
             IJ.run(source, "Arrange Channels...", "new=" +
-                choice.muscleEndplateChannel() + choice.nerveTerminalChannel());
+                choice.muscleEndplateChannel + choice.nerveTerminalChannel);
             selected = currentRequired("Arrange Channels");
         }
         selected.setC(1);

@@ -6,13 +6,13 @@ import org.scijava.plugin.Plugin;
 @Plugin(type = Command.class, menuPath = "Analyze>Tools>aNMJ-morph+")
 public class ANMJMorphCommand implements Command {
 
-    private final WorkflowRunner workflowRunner;
+    private final Runnable workflowRunner;
 
     public ANMJMorphCommand() {
         this(new InputWorkflowRunner());
     }
 
-    ANMJMorphCommand(final WorkflowRunner workflowRunner) {
+    ANMJMorphCommand(final Runnable workflowRunner) {
         this.workflowRunner = workflowRunner;
     }
 

@@ -5,9 +5,11 @@ import ij.WindowManager;
 
 import java.nio.file.Path;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.BiConsumer;
 
-final class JavaBatchFileProcessor implements BatchSessionRunner.FileProcessor {
+final class JavaBatchFileProcessor implements BiConsumer<Path, BatchChoiceResolver> {
 
     private final ImageLoader imageLoader = new ImageLoader();
     private final StructuralNormalizer structuralNormalizer = new StructuralNormalizer();
@@ -16,12 +18,11 @@ final class JavaBatchFileProcessor implements BatchSessionRunner.FileProcessor {
     private final CsvOutputWriter outputWriter = new CsvOutputWriter();
 
     @Override
-    public void process(final Path path, final BatchChoiceResolver choices) {
+    public void accept(final Path path, final BatchChoiceResolver choices) {
         final Set<Integer> existingImageIds = currentImageIds();
         try {
             ImagePlus image = load(path);
-            final ImageShape shape = ImageShape.from(image);
-            final InputNormalization normalization = InputPolicy.normalizationFor(shape);
+            final InputNormalization normalization = InputPolicy.normalizationFor(image);
             if (normalization == InputNormalization.REJECT_TIME_SERIES) {
                 image.close();
                 throw BatchFileException.precheck("T_GT_1", InputWorkflowRunner.TIME_SERIES_ERROR);
@@ -33,8 +34,10 @@ final class JavaBatchFileProcessor implements BatchSessionRunner.FileProcessor {
             TwoPlaneInterpretation twoPlaneChoice = null;
             if (normalization == InputNormalization.CHOOSE_TWO_PLANE_INTERPRETATION) {
                 image.show();
-                twoPlaneChoice = choices.resolveTwoPlane(InputSignature.of(format, shape, normalization, null));
+                twoPlaneChoice = choices.resolveTwoPlane(BatchChoiceResolver.signature(format, image, normalization, null));
             }
+            final String interpretation = twoPlaneChoice == null ? null : twoPlaneChoice.name();
+            final String channelSignature = BatchChoiceResolver.signature(format, image, normalization, interpretation);
 
             final ImagePlus normalized = structuralNormalizer.normalize(image, twoPlaneChoice);
             if (normalized != image) {
@@ -53,9 +56,8 @@ final class JavaBatchFileProcessor implements BatchSessionRunner.FileProcessor {
                 );
             }
 
-            final String interpretation = twoPlaneChoice == null ? null : twoPlaneChoice.name();
             final BatchChoiceResolver.ChannelChoice selected = choices.resolveChannels(
-                InputSignature.of(format, shape, normalization, interpretation),
+                channelSignature,
                 channelCount
             );
 
@@ -81,7 +83,11 @@ final class JavaBatchFileProcessor implements BatchSessionRunner.FileProcessor {
             } catch (BatchFileException e) {
                 throw e;
             } catch (RuntimeException e) {
-                throw BatchFileException.runtime("ANALYSIS_FAILED", messageOrClass(e), e);
+                throw BatchFileException.runtime(
+                    "ANALYSIS_FAILED",
+                    Objects.toString(e.getMessage(), e.getClass().getSimpleName()),
+                    e
+                );
             }
         } finally {
             closeImagesCreatedAfter(existingImageIds);
@@ -126,7 +132,4 @@ final class JavaBatchFileProcessor implements BatchSessionRunner.FileProcessor {
         }
     }
 
-    private static String messageOrClass(final RuntimeException error) {
-        return error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
-    }
 }

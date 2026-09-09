@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -155,8 +156,8 @@ public class InputWorkflowRunnerTest {
         final java.util.function.Supplier<Path> fileSelector,
         final java.util.function.Function<Path, ImagePlus> imageLoader,
         final java.util.function.Consumer<ImagePlus> imagePresenter,
-        final InputWorkflowRunner.SingleImageProcessor singleImageProcessor,
-        final WorkflowRunner batchRunner,
+        final BiConsumer<ImagePlus, Path> singleImageProcessor,
+        final Runnable batchRunner,
         final java.util.function.Consumer<String> errorReporter
     ) {
         return new InputWorkflowRunner(
