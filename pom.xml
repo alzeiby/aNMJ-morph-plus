@@ -120,13 +120,6 @@
       <resource>
         <directory>src/main/resources</directory>
       </resource>
-      <resource>
-        <directory>${project.basedir}</directory>
-        <includes>
-          <include>aNMJ-morph macro.txt</include>
-        </includes>
-        <targetPath>legacy</targetPath>
-      </resource>
     </resources>
   </build>
 </project>

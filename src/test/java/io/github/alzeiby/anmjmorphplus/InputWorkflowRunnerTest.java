@@ -18,58 +18,60 @@ import static org.junit.Assert.assertTrue;
 public class InputWorkflowRunnerTest {
 
     @Test
-    public void currentImageUsesExactImageIdHandoff() {
+    public void currentImageUsesDirectJavaAnalysisWithNoSyntheticPath() {
         final ImagePlus image = IJ.createHyperStack("current", 8, 8, 2, 1, 1, 8);
-        final AtomicReference<String> argument = new AtomicReference<>();
+        final AtomicReference<ImagePlus> analyzed = new AtomicReference<>();
+        final AtomicReference<Path> path = new AtomicReference<>();
         final InputWorkflowRunner runner = runner(
             () -> image,
             () -> { throw new AssertionError("mode selector should not run"); },
             () -> { throw new AssertionError("file selector should not run"); },
-            path -> { throw new AssertionError("loader should not run"); },
-            imageToShow -> { throw new AssertionError("current image should not be shown again"); },
-            argument::set,
+            selected -> { throw new AssertionError("loader should not run"); },
+            shown -> { throw new AssertionError("current image should not be shown again"); },
+            (subject, inputPath) -> { analyzed.set(subject); path.set(inputPath); },
             () -> { throw new AssertionError("batch runner should not run"); },
             message -> { throw new AssertionError(message); }
         );
 
         runner.run();
 
-        assertEquals(InputWorkflowRunner.IMAGE_ARGUMENT_PREFIX + image.getID(), argument.get());
+        assertSame(image, analyzed.get());
+        assertNull(path.get());
     }
 
     @Test
-    public void currentTimeSeriesIsRejectedBeforeMacroHandoff() {
+    public void currentTimeSeriesIsRejectedBeforeJavaAnalysis() {
         final ImagePlus image = IJ.createHyperStack("time", 8, 8, 1, 1, 2, 8);
         final AtomicReference<String> error = new AtomicReference<>();
-        final AtomicBoolean macroRan = new AtomicBoolean(false);
+        final AtomicBoolean analysisRan = new AtomicBoolean(false);
         final InputWorkflowRunner runner = runner(
             () -> image,
             () -> InputMode.SINGLE_IMAGE,
             () -> Paths.get("unused.tif"),
-            path -> image,
+            selected -> image,
             ignored -> { },
-            argument -> macroRan.set(true),
+            (subject, inputPath) -> analysisRan.set(true),
             () -> { throw new AssertionError("batch runner should not run"); },
             error::set
         );
 
         runner.run();
 
-        assertFalse(macroRan.get());
+        assertFalse(analysisRan.get());
         assertEquals(InputWorkflowRunner.TIME_SERIES_ERROR, error.get());
     }
 
     @Test
-    public void batchChoiceUsesDedicatedMacroArgument() {
+    public void batchChoiceRunsDedicatedJavaBatchWorkflow() {
         final AtomicBoolean batchRan = new AtomicBoolean(false);
-        final AtomicReference<String> argument = new AtomicReference<>();
+        final AtomicBoolean singleRan = new AtomicBoolean(false);
         final InputWorkflowRunner runner = runner(
             () -> null,
             () -> InputMode.BATCH_FOLDER,
             () -> { throw new AssertionError("file selector should not run"); },
-            path -> { throw new AssertionError("loader should not run"); },
+            selected -> { throw new AssertionError("loader should not run"); },
             ignored -> { },
-            argument::set,
+            (subject, inputPath) -> singleRan.set(true),
             () -> batchRan.set(true),
             message -> { throw new AssertionError(message); }
         );
@@ -77,26 +79,24 @@ public class InputWorkflowRunnerTest {
         runner.run();
 
         assertTrue(batchRan.get());
-        assertNull(argument.get());
+        assertFalse(singleRan.get());
     }
 
     @Test
-    public void selectedSingleImageIsLoadedPresentedAndHandedOffById() {
+    public void selectedSingleImageIsLoadedPresentedAndAnalyzedWithSelectedPath() {
         final Path path = Paths.get("fixture.lsm");
         final ImagePlus image = IJ.createHyperStack("loaded", 8, 8, 2, 1, 1, 8);
         final AtomicReference<Path> loadedPath = new AtomicReference<>();
         final AtomicReference<ImagePlus> presented = new AtomicReference<>();
-        final AtomicReference<String> argument = new AtomicReference<>();
+        final AtomicReference<ImagePlus> analyzed = new AtomicReference<>();
+        final AtomicReference<Path> analyzedPath = new AtomicReference<>();
         final InputWorkflowRunner runner = runner(
             () -> null,
             () -> InputMode.SINGLE_IMAGE,
             () -> path,
-            selected -> {
-                loadedPath.set(selected);
-                return image;
-            },
+            selected -> { loadedPath.set(selected); return image; },
             presented::set,
-            argument::set,
+            (subject, inputPath) -> { analyzed.set(subject); analyzedPath.set(inputPath); },
             () -> { throw new AssertionError("batch runner should not run"); },
             message -> { throw new AssertionError(message); }
         );
@@ -105,47 +105,48 @@ public class InputWorkflowRunnerTest {
 
         assertEquals(path, loadedPath.get());
         assertSame(image, presented.get());
-        assertEquals(InputWorkflowRunner.IMAGE_ARGUMENT_PREFIX + image.getID(), argument.get());
+        assertSame(image, analyzed.get());
+        assertEquals(path, analyzedPath.get());
     }
 
     @Test
-    public void loaderFailureIsReportedWithoutMacroHandoff() {
+    public void loaderFailureIsReportedWithoutJavaAnalysis() {
         final AtomicReference<String> error = new AtomicReference<>();
-        final AtomicReference<String> argument = new AtomicReference<>();
+        final AtomicBoolean analyzed = new AtomicBoolean(false);
         final InputWorkflowRunner runner = runner(
             () -> null,
             () -> InputMode.SINGLE_IMAGE,
             () -> Paths.get("bad.gif"),
-            path -> { throw new ImageLoadingException("Unsupported image format: bad.gif"); },
+            selected -> { throw new ImageLoadingException("Unsupported image format: bad.gif"); },
             ignored -> { },
-            argument::set,
+            (subject, inputPath) -> analyzed.set(true),
             () -> { throw new AssertionError("batch runner should not run"); },
             error::set
         );
 
         runner.run();
 
-        assertNull(argument.get());
+        assertFalse(analyzed.get());
         assertEquals("Unsupported image format: bad.gif", error.get());
     }
 
     @Test
     public void canceledModeDoesNothing() {
-        final AtomicBoolean macroRan = new AtomicBoolean(false);
+        final AtomicBoolean analysisRan = new AtomicBoolean(false);
         final InputWorkflowRunner runner = runner(
             () -> null,
             () -> null,
             () -> { throw new AssertionError("file selector should not run"); },
-            path -> { throw new AssertionError("loader should not run"); },
+            selected -> { throw new AssertionError("loader should not run"); },
             ignored -> { },
-            argument -> macroRan.set(true),
+            (subject, inputPath) -> analysisRan.set(true),
             () -> { throw new AssertionError("batch runner should not run"); },
             message -> { throw new AssertionError(message); }
         );
 
         runner.run();
 
-        assertFalse(macroRan.get());
+        assertFalse(analysisRan.get());
     }
 
     private static InputWorkflowRunner runner(
@@ -154,7 +155,7 @@ public class InputWorkflowRunnerTest {
         final java.util.function.Supplier<Path> fileSelector,
         final java.util.function.Function<Path, ImagePlus> imageLoader,
         final java.util.function.Consumer<ImagePlus> imagePresenter,
-        final java.util.function.Consumer<String> macroRunner,
+        final InputWorkflowRunner.SingleImageProcessor singleImageProcessor,
         final WorkflowRunner batchRunner,
         final java.util.function.Consumer<String> errorReporter
     ) {
@@ -164,7 +165,7 @@ public class InputWorkflowRunnerTest {
             fileSelector,
             imageLoader,
             imagePresenter,
-            macroRunner,
+            singleImageProcessor,
             batchRunner,
             errorReporter
         );

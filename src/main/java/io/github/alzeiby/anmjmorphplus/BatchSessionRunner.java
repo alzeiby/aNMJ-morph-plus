@@ -43,7 +43,7 @@ final class BatchSessionRunner implements WorkflowRunner {
         this(
             BatchSessionRunner::chooseRoot,
             new BatchCheckpointStore(),
-            new LegacyBatchFileProcessor(),
+            new JavaBatchFileProcessor(),
             BatchChoiceResolver.interactivePrompter(),
             IJ::log
         );
