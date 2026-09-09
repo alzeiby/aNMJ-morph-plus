@@ -54,7 +54,7 @@ final class JavaBatchFileProcessor implements BiConsumer<Path, BatchChoiceResolv
 
             BatchChoiceResolver.ChannelChoice analysisChoice = selected;
             boolean channelsCanonical = false;
-            if (channelCount <= ChannelRoleCanonicalizer.IMAGEJ_ARRANGER_MAX_CHANNELS) {
+            if (channelCount <= SingleImageAnalysisRunner.IMAGEJ_ARRANGER_MAX_CHANNELS) {
                 image = analysisRunner.canonicalizeSelected(image, selected);
                 analysisChoice = new BatchChoiceResolver.ChannelChoice(1, 2);
                 channelsCanonical = image.getNChannels() == 2 && image.isComposite();

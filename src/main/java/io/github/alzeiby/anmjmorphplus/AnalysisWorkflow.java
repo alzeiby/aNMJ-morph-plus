@@ -289,7 +289,6 @@ final class AnalysisWorkflow {
         if (image == null) {
             throw new IllegalStateException("Could not open intermediate TIFF: " + path);
         }
-        image.setTitle(path.getFileName().toString());
         image.show();
         makeCurrent(image);
         return image;

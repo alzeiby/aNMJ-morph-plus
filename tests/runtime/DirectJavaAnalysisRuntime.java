@@ -142,8 +142,8 @@ public final class DirectJavaAnalysisRuntime {
 
             BatchChoiceResolver.ChannelChoice analysisChoice = CHANNELS;
             boolean channelsCanonical = false;
-            if (image.getNChannels() <= ChannelRoleCanonicalizer.IMAGEJ_ARRANGER_MAX_CHANNELS) {
-                final ImagePlus canonical = new ChannelRoleCanonicalizer().canonicalize(image, CHANNELS);
+            if (image.getNChannels() <= SingleImageAnalysisRunner.IMAGEJ_ARRANGER_MAX_CHANNELS) {
+                final ImagePlus canonical = SingleImageAnalysisRunner.canonicalize(image, CHANNELS);
                 if (canonical != image) {
                     image.changes = false;
                     image.close();

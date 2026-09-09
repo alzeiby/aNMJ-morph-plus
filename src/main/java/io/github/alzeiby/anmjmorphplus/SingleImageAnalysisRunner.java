@@ -3,13 +3,16 @@ package io.github.alzeiby.anmjmorphplus;
 import ij.ImagePlus;
 import ij.io.DirectoryChooser;
 import ij.io.FileInfo;
+import ij.plugin.ChannelArranger;
 
 import java.nio.file.Path;
+import java.util.Objects;
 
 final class SingleImageAnalysisRunner {
 
+    static final int IMAGEJ_ARRANGER_MAX_CHANNELS = 9;
+
     private final StructuralNormalizer structuralNormalizer = new StructuralNormalizer();
-    private final ChannelRoleCanonicalizer channelRoleCanonicalizer = new ChannelRoleCanonicalizer();
     private final AnalysisWorkflow analysisWorkflow = new AnalysisWorkflow();
     private final CsvOutputWriter outputWriter = new CsvOutputWriter();
 
@@ -59,7 +62,7 @@ final class SingleImageAnalysisRunner {
     ) {
         BatchChoiceResolver.ChannelChoice analysisChoice = selected;
         boolean channelsCanonical = false;
-        if (image.getNChannels() <= ChannelRoleCanonicalizer.IMAGEJ_ARRANGER_MAX_CHANNELS) {
+        if (image.getNChannels() <= IMAGEJ_ARRANGER_MAX_CHANNELS) {
             image = canonicalizeSelected(image, selected);
             analysisChoice = new BatchChoiceResolver.ChannelChoice(1, 2);
             channelsCanonical = image.getNChannels() == 2 && image.isComposite();
@@ -72,10 +75,34 @@ final class SingleImageAnalysisRunner {
         final ImagePlus image,
         final BatchChoiceResolver.ChannelChoice selected
     ) {
-        final ImagePlus canonical = channelRoleCanonicalizer.canonicalize(image, selected);
+        final ImagePlus canonical = canonicalize(image, selected);
         if (canonical != image) {
             canonical.show();
         }
+        return canonical;
+    }
+
+    static ImagePlus canonicalize(
+        final ImagePlus image,
+        final BatchChoiceResolver.ChannelChoice selected
+    ) {
+        Objects.requireNonNull(image, "image");
+        Objects.requireNonNull(selected, "selected");
+        if (image.getNChannels() > IMAGEJ_ARRANGER_MAX_CHANNELS ||
+            image.getNChannels() == 2 && selected.muscleEndplateChannel == 1 && selected.nerveTerminalChannel == 2) {
+            return image;
+        }
+
+        final ImagePlus canonical = ChannelArranger.run(
+            image,
+            new int[] {selected.muscleEndplateChannel, selected.nerveTerminalChannel}
+        );
+        if (canonical == null) {
+            throw new IllegalStateException("ImageJ could not arrange the selected channels");
+        }
+        canonical.setTitle(image.getTitle());
+        canonical.setCalibration(image.getCalibration());
+        canonical.setFileInfo(image.getOriginalFileInfo());
         return canonical;
     }
 

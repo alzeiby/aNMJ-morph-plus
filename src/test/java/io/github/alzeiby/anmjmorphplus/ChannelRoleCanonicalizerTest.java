@@ -20,8 +20,6 @@ import static org.junit.Assert.assertTrue;
 
 public class ChannelRoleCanonicalizerTest {
 
-    private final ChannelRoleCanonicalizer canonicalizer = new ChannelRoleCanonicalizer();
-
     @Test
     public void threeChannelChoiceThreeOneMatchesImageJAndDropsIgnoredChannel() {
         final ImagePlus actual = threeChannelByteImage("source.lsm", 11, 22, 33);
@@ -31,7 +29,7 @@ public class ChannelRoleCanonicalizerTest {
         final ImagePlus expected = ChannelArranger.run(reference, new int[] {3, 1});
         expected.copyAttributes(reference);
 
-        final ImagePlus canonical = canonicalizer.canonicalize(actual, choice(3, 1));
+        final ImagePlus canonical = SingleImageAnalysisRunner.canonicalize(actual, choice(3, 1));
 
         assertNotSame(actual, canonical);
         assertEquals(2, canonical.getNChannels());
@@ -61,7 +59,7 @@ public class ChannelRoleCanonicalizerTest {
         reference.setOpenAsHyperStack(true);
         final ImagePlus expected = ChannelArranger.run(reference, new int[] {3, 1});
 
-        final ImagePlus canonical = canonicalizer.canonicalize(actual, choice(3, 1));
+        final ImagePlus canonical = SingleImageAnalysisRunner.canonicalize(actual, choice(3, 1));
 
         assertEquals(expected.getStackSize(), canonical.getStackSize());
         for (int slice = 1; slice <= canonical.getStackSize(); slice++) {
@@ -78,7 +76,7 @@ public class ChannelRoleCanonicalizerTest {
     public void twoChannelSwapProducesCanonicalOneTwoOrder() {
         final ImagePlus image = twoChannelByteImage("swap.tif", 7, 19);
 
-        final ImagePlus canonical = canonicalizer.canonicalize(image, choice(2, 1));
+        final ImagePlus canonical = SingleImageAnalysisRunner.canonicalize(image, choice(2, 1));
 
         assertNotSame(image, canonical);
         assertEquals(2, canonical.getNChannels());
@@ -90,7 +88,7 @@ public class ChannelRoleCanonicalizerTest {
     public void alreadyCanonicalTwoChannelImageIsExactNoOp() {
         final ImagePlus image = twoChannelByteImage("ordinary.tif", 7, 19);
 
-        final ImagePlus canonical = canonicalizer.canonicalize(image, choice(1, 2));
+        final ImagePlus canonical = SingleImageAnalysisRunner.canonicalize(image, choice(1, 2));
 
         assertSame(image, canonical);
     }
@@ -109,7 +107,7 @@ public class ChannelRoleCanonicalizerTest {
         composite.setPosition(3, 1, 1);
         composite.setDisplayRange(30, 130);
 
-        final ImagePlus canonical = canonicalizer.canonicalize(composite, choice(3, 1));
+        final ImagePlus canonical = SingleImageAnalysisRunner.canonicalize(composite, choice(3, 1));
 
         assertTrue(canonical instanceof CompositeImage);
         final CompositeImage arranged = (CompositeImage) canonical;
@@ -135,7 +133,7 @@ public class ChannelRoleCanonicalizerTest {
         image.setDimensions(3, 1, 1);
         image.setOpenAsHyperStack(true);
 
-        final ImagePlus canonical = canonicalizer.canonicalize(image, choice(3, 1));
+        final ImagePlus canonical = SingleImageAnalysisRunner.canonicalize(image, choice(3, 1));
 
         assertRawFloatBits(canonical.getStack().getProcessor(1).getf(0), payloadNaN);
         assertRawFloatBits(canonical.getStack().getProcessor(1).getf(1), Float.POSITIVE_INFINITY);
@@ -155,7 +153,7 @@ public class ChannelRoleCanonicalizerTest {
         z.setOpenAsHyperStack(true);
         final ImagePlus projected = new StructuralNormalizer().normalize(z, null);
 
-        final ImagePlus canonical = canonicalizer.canonicalize(projected, choice(3, 1));
+        final ImagePlus canonical = SingleImageAnalysisRunner.canonicalize(projected, choice(3, 1));
 
         assertEquals(2, canonical.getNChannels());
         assertEquals(1, canonical.getNSlices());
@@ -177,7 +175,7 @@ public class ChannelRoleCanonicalizerTest {
         source.setDimensions(3, 1, 1);
         source.setOpenAsHyperStack(true);
 
-        final ImagePlus canonical = canonicalizer.canonicalize(source, choice(3, 1));
+        final ImagePlus canonical = SingleImageAnalysisRunner.canonicalize(source, choice(3, 1));
 
         assertNotSame(source, canonical);
         assertEquals(1, closes.get());
@@ -194,7 +192,7 @@ public class ChannelRoleCanonicalizerTest {
         image.setDimensions(10, 1, 1);
         image.setOpenAsHyperStack(true);
 
-        final ImagePlus canonical = canonicalizer.canonicalize(image, choice(3, 1));
+        final ImagePlus canonical = SingleImageAnalysisRunner.canonicalize(image, choice(3, 1));
 
         assertSame(image, canonical);
         assertEquals(10, canonical.getNChannels());

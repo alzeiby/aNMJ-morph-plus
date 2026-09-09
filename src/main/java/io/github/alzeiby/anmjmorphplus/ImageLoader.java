@@ -76,11 +76,6 @@ final class ImageLoader {
 
             final ImporterOptions options = new ImporterOptions();
             options.setId(absolutePath);
-            options.setAutoscale(true);
-            options.setColorMode(ImporterOptions.COLOR_MODE_DEFAULT);
-            options.setStackFormat(ImporterOptions.VIEW_HYPERSTACK);
-            options.setStackOrder(ImporterOptions.ORDER_XYCZT);
-            options.setOpenAllSeries(false);
             options.setQuiet(true);
 
             final ImagePlus[] images = bioFormatsOpener.open(options);
