@@ -4,6 +4,7 @@ import ij.IJ;
 import ij.CompositeImage;
 import ij.ImagePlus;
 import ij.ImageStack;
+import ij.WindowManager;
 import ij.io.FileInfo;
 import ij.macro.Interpreter;
 import ij.process.ByteProcessor;
@@ -20,6 +21,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
@@ -37,7 +39,8 @@ public class LegacyBatchFileProcessorTest {
             path -> image,
             ignored -> presented.set(true),
             argument -> { macroRan.set(true); return null; },
-            new StructuralNormalizer()
+            new StructuralNormalizer(),
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest
         );
 
         final BatchFileException error = assertThrows(
@@ -59,7 +62,8 @@ public class LegacyBatchFileProcessorTest {
             path -> image,
             ignored -> { },
             value -> { argument.set(value); return null; },
-            new StructuralNormalizer()
+            new StructuralNormalizer(),
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest
         );
 
         processor.process(Path.of("sample.tif"), resolver());
@@ -67,6 +71,7 @@ public class LegacyBatchFileProcessorTest {
         assertTrue(argument.get().contains("muscle-channel=1"));
         assertTrue(argument.get().contains("nerve-channel=2"));
         assertTrue(argument.get().contains("channels-canonical=1"));
+        assertTrue(argument.get().contains("source-copy-id="));
         assertFalse(argument.get().contains("two-plane="));
     }
 
@@ -96,7 +101,8 @@ public class LegacyBatchFileProcessorTest {
             path -> source,
             presented::add,
             value -> { argument.set(value); return null; },
-            new StructuralNormalizer()
+            new StructuralNormalizer(),
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest
         );
 
         processor.process(Path.of("three.tif"), resolver(3, 1));
@@ -134,7 +140,8 @@ public class LegacyBatchFileProcessorTest {
             path -> source,
             presented::add,
             value -> { argument.set(value); return null; },
-            new StructuralNormalizer()
+            new StructuralNormalizer(),
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest
         );
 
         processor.process(Path.of("swap.tif"), resolver(2, 1));
@@ -164,7 +171,8 @@ public class LegacyBatchFileProcessorTest {
             path -> image,
             ignored -> { },
             value -> { argument.set(value); return null; },
-            new StructuralNormalizer()
+            new StructuralNormalizer(),
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest
         );
 
         processor.process(Path.of("canonical.tif"), resolver(1, 2));
@@ -181,7 +189,8 @@ public class LegacyBatchFileProcessorTest {
             path -> image,
             ignored -> { },
             argument -> "[aborted]",
-            new StructuralNormalizer()
+            new StructuralNormalizer(),
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest
         );
 
         final BatchFileException error = assertThrows(
@@ -194,6 +203,96 @@ public class LegacyBatchFileProcessorTest {
     }
 
     @Test
+    public void registeredJavaSourceCopyIsClosedOnMacroAbortAndSentinelSurvives() throws Exception {
+        final boolean previousBatchMode = Interpreter.batchMode;
+        final AtomicInteger sentinelCloses = new AtomicInteger();
+        final ImagePlus sentinel = new ImagePlus("sentinel-abort", new ByteProcessor(1, 1)) {
+            @Override
+            public void close() {
+                sentinelCloses.incrementAndGet();
+                super.close();
+            }
+        };
+        final ImagePlus image = IJ.createHyperStack("abort.tif", 2, 1, 2, 1, 1, 8);
+        final AtomicReference<Integer> sourceCopyId = new AtomicReference<>();
+        Interpreter.batchMode = true;
+        Interpreter.addBatchModeImage(sentinel);
+        try {
+            final LegacyBatchFileProcessor processor = new LegacyBatchFileProcessor(
+                path -> image,
+                Interpreter::addBatchModeImage,
+                argument -> {
+                    final int id = Integer.parseInt(argumentValue(argument, "source-copy-id"));
+                    sourceCopyId.set(id);
+                    assertTrue(WindowManager.getImage(id) != null);
+                    return "[aborted]";
+                },
+                new StructuralNormalizer()
+            );
+
+            final BatchFileException error = assertThrows(
+                BatchFileException.class,
+                () -> processor.process(Path.of("abort.tif"), resolver())
+            );
+
+            assertEquals("USER_CANCELLED", error.reasonCode());
+            assertTrue(sourceCopyId.get() != null);
+            assertNull(WindowManager.getImage(sourceCopyId.get()));
+            assertEquals(0, sentinelCloses.get());
+            assertTrue(batchImageRegistered(sentinel.getID()));
+        } finally {
+            Interpreter.removeBatchModeImage(image);
+            Interpreter.removeBatchModeImage(sentinel);
+            Interpreter.batchMode = previousBatchMode;
+        }
+    }
+
+    @Test
+    public void registeredJavaSourceCopyIsClosedOnMacroErrorAndSentinelSurvives() throws Exception {
+        final boolean previousBatchMode = Interpreter.batchMode;
+        final AtomicInteger sentinelCloses = new AtomicInteger();
+        final ImagePlus sentinel = new ImagePlus("sentinel-error", new ByteProcessor(1, 1)) {
+            @Override
+            public void close() {
+                sentinelCloses.incrementAndGet();
+                super.close();
+            }
+        };
+        final ImagePlus image = IJ.createHyperStack("error.tif", 2, 1, 2, 1, 1, 8);
+        final AtomicReference<Integer> sourceCopyId = new AtomicReference<>();
+        Interpreter.batchMode = true;
+        Interpreter.addBatchModeImage(sentinel);
+        try {
+            final LegacyBatchFileProcessor processor = new LegacyBatchFileProcessor(
+                path -> image,
+                Interpreter::addBatchModeImage,
+                argument -> {
+                    final int id = Integer.parseInt(argumentValue(argument, "source-copy-id"));
+                    sourceCopyId.set(id);
+                    assertTrue(WindowManager.getImage(id) != null);
+                    throw new IllegalStateException("synthetic macro failure");
+                },
+                new StructuralNormalizer()
+            );
+
+            final BatchFileException error = assertThrows(
+                BatchFileException.class,
+                () -> processor.process(Path.of("error.tif"), resolver())
+            );
+
+            assertEquals("MACRO_ERROR", error.reasonCode());
+            assertTrue(sourceCopyId.get() != null);
+            assertNull(WindowManager.getImage(sourceCopyId.get()));
+            assertEquals(0, sentinelCloses.get());
+            assertTrue(batchImageRegistered(sentinel.getID()));
+        } finally {
+            Interpreter.removeBatchModeImage(image);
+            Interpreter.removeBatchModeImage(sentinel);
+            Interpreter.batchMode = previousBatchMode;
+        }
+    }
+
+    @Test
     public void ambiguousTwoPlaneChannelsAreNormalizedBeforeMacro() throws Exception {
         final ImagePlus image = IJ.createHyperStack("two-plane.tif", 8, 8, 1, 2, 1, 8);
         final AtomicReference<String> argument = new AtomicReference<>();
@@ -201,7 +300,8 @@ public class LegacyBatchFileProcessorTest {
             path -> image,
             ignored -> { },
             value -> { argument.set(value); return null; },
-            new StructuralNormalizer()
+            new StructuralNormalizer(),
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest
         );
 
         processor.process(Path.of("two-plane.tif"), resolver());
@@ -229,7 +329,8 @@ public class LegacyBatchFileProcessorTest {
             path -> image,
             presented::add,
             value -> { argument.set(value); return null; },
-            new StructuralNormalizer()
+            new StructuralNormalizer(),
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest
         );
 
         processor.process(
@@ -270,7 +371,8 @@ public class LegacyBatchFileProcessorTest {
             path -> image,
             presented::add,
             argument -> { macroRan.set(true); return null; },
-            new StructuralNormalizer()
+            new StructuralNormalizer(),
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest
         );
 
         final BatchFileException error = assertThrows(
@@ -309,7 +411,8 @@ public class LegacyBatchFileProcessorTest {
             path -> rgb,
             presented::set,
             value -> { argument.set(value); return null; },
-            new StructuralNormalizer()
+            new StructuralNormalizer(),
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest
         );
 
         processor.process(Path.of("rgb.png"), resolver());
@@ -355,7 +458,8 @@ public class LegacyBatchFileProcessorTest {
             path -> image,
             presented::set,
             value -> { argument.set(value); return null; },
-            new StructuralNormalizer()
+            new StructuralNormalizer(),
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest
         );
 
         processor.process(Path.of("z.lsm"), resolver());
@@ -413,7 +517,8 @@ public class LegacyBatchFileProcessorTest {
             path -> image,
             ignored -> { },
             value -> { argument.set(value); return null; },
-            new StructuralNormalizer()
+            new StructuralNormalizer(),
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest
         );
 
         processor.process(Path.of("remember.tif"), resolver);
@@ -446,7 +551,8 @@ public class LegacyBatchFileProcessorTest {
             path -> image,
             presented::add,
             value -> { argument.set(value); return null; },
-            new StructuralNormalizer()
+            new StructuralNormalizer(),
+            LegacyBatchFileProcessorTest::duplicateForProcessorTest
         );
 
         processor.process(Path.of("ten.tif"), resolver(3, 1));
@@ -484,7 +590,8 @@ public class LegacyBatchFileProcessorTest {
                 path -> image,
                 ignored -> { },
                 argument -> null,
-                new StructuralNormalizer()
+                new StructuralNormalizer(),
+                LegacyBatchFileProcessorTest::duplicateForProcessorTest
             );
 
             processor.process(Path.of("sample.tif"), resolver(3, 1));
@@ -506,6 +613,31 @@ public class LegacyBatchFileProcessorTest {
 
     private BatchChoiceResolver resolver() throws Exception {
         return resolver(TwoPlaneInterpretation.CHANNELS);
+    }
+
+    private static ImagePlus duplicateForProcessorTest(final ImagePlus source) {
+        final ImagePlus copy = source.duplicate();
+        copy.setTitle("__aNMJ_source_" + source.getID());
+        return copy;
+    }
+
+    private static String argumentValue(final String argument, final String key) {
+        final String prefix = key + "=";
+        for (String part : argument.split(";")) {
+            if (part.startsWith(prefix)) {
+                return part.substring(prefix.length());
+            }
+        }
+        throw new AssertionError("Missing macro argument " + key);
+    }
+
+    private static boolean batchImageRegistered(final int id) {
+        for (int registeredId : Interpreter.getBatchModeImageIDs()) {
+            if (registeredId == id) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private BatchChoiceResolver resolver(final TwoPlaneInterpretation twoPlaneInterpretation) throws Exception {

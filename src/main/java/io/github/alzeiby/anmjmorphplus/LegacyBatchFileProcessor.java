@@ -17,6 +17,7 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
     private final Function<String, String> macroRunner;
     private final StructuralNormalizer structuralNormalizer;
     private final ChannelRoleCanonicalizer channelRoleCanonicalizer;
+    private final Function<ImagePlus, ImagePlus> sourceCopyDuplicator;
 
     LegacyBatchFileProcessor() {
         final ImageLoader loader = new ImageLoader();
@@ -26,6 +27,7 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
         this.macroRunner = macro::runForResult;
         this.structuralNormalizer = new StructuralNormalizer();
         this.channelRoleCanonicalizer = new ChannelRoleCanonicalizer();
+        this.sourceCopyDuplicator = new SourceCopyDuplicator()::duplicate;
     }
 
     LegacyBatchFileProcessor(
@@ -34,11 +36,28 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
         final Function<String, String> macroRunner,
         final StructuralNormalizer structuralNormalizer
     ) {
+        this(
+            imageLoader,
+            imagePresenter,
+            macroRunner,
+            structuralNormalizer,
+            new SourceCopyDuplicator()::duplicate
+        );
+    }
+
+    LegacyBatchFileProcessor(
+        final Function<Path, ImagePlus> imageLoader,
+        final Consumer<ImagePlus> imagePresenter,
+        final Function<String, String> macroRunner,
+        final StructuralNormalizer structuralNormalizer,
+        final Function<ImagePlus, ImagePlus> sourceCopyDuplicator
+    ) {
         this.imageLoader = Objects.requireNonNull(imageLoader, "imageLoader");
         this.imagePresenter = Objects.requireNonNull(imagePresenter, "imagePresenter");
         this.macroRunner = Objects.requireNonNull(macroRunner, "macroRunner");
         this.structuralNormalizer = Objects.requireNonNull(structuralNormalizer, "structuralNormalizer");
         this.channelRoleCanonicalizer = new ChannelRoleCanonicalizer();
+        this.sourceCopyDuplicator = Objects.requireNonNull(sourceCopyDuplicator, "sourceCopyDuplicator");
     }
 
     @Override
@@ -110,7 +129,21 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
                 channelsCanonical = image.getNChannels() == 2 && image.isComposite();
             }
 
-            final String argument = buildMacroArgument(image, macroChannelChoice, channelsCanonical);
+            final ImagePlus sourceCopy;
+            try {
+                sourceCopy = Objects.requireNonNull(
+                    sourceCopyDuplicator.apply(image),
+                    "sourceCopyDuplicator returned null"
+                );
+            } catch (RuntimeException e) {
+                throw BatchFileException.runtime("SOURCE_COPY_FAILED", messageOrClass(e), e);
+            }
+            final String argument = buildMacroArgument(
+                image,
+                macroChannelChoice,
+                channelsCanonical,
+                sourceCopy.getID()
+            );
             final String result;
             try {
                 result = macroRunner.apply(argument);
@@ -128,12 +161,14 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
     static String buildMacroArgument(
         final ImagePlus image,
         final BatchChoiceResolver.ChannelChoice channelChoice,
-        final boolean channelsCanonical
+        final boolean channelsCanonical,
+        final int sourceCopyId
     ) {
         final StringBuilder argument = new StringBuilder()
             .append("image-id=").append(image.getID())
             .append(";muscle-channel=").append(channelChoice.muscleEndplateChannel())
-            .append(";nerve-channel=").append(channelChoice.nerveTerminalChannel());
+            .append(";nerve-channel=").append(channelChoice.nerveTerminalChannel())
+            .append(";source-copy-id=").append(sourceCopyId);
         if (channelsCanonical) {
             argument.append(";channels-canonical=1");
         }

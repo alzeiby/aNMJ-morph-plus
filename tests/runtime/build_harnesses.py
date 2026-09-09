@@ -107,6 +107,41 @@ run("Quit");
 '''
     text = replace_once(text, dispatch_pattern, dispatch, "top-level dispatch")
 
+    if supplied_channels:
+        java_argument_global = "javaArgument = getArgument();"
+        if java_argument_global not in text:
+            raise RuntimeError("Production macro does not expose the top-level Java argument")
+        text = text.replace(java_argument_global, "var javaArgument = getArgument();", 1)
+        source_copy_title = '  sourceCopyTitle = "__aNMJ_source_" + originalImageId;'
+        if source_copy_title not in text:
+            raise RuntimeError("Production macro does not expose the initial source-copy stage")
+        text = text.replace(
+            source_copy_title,
+            source_copy_title + '''
+  run("Duplicate...", "title=[" + sourceCopyTitle + "] duplicate");
+  javaSuppliedSourceCopyId = getImageID();
+  selectImage(originalImageId);
+  javaArgument = javaArgument + ";source-copy-id=" + javaSuppliedSourceCopyId;
+  if (indexOf(javaArgument, ";muscle-channel=1;nerve-channel=2;channels-canonical=1;source-copy-id=") < 0) {
+    exit("Error: Java bridge argument scope lost before source-copy handoff");
+  }
+  File.append("STAGE 1 Java source copy argument preserved", testLog);
+  File.append("STAGE 1 Java source copy supplied", testLog);''',
+            1,
+        )
+        source_copy_complete = '  outputFilename = originalDirectory + "raw_data_table.csv";'
+        if source_copy_complete not in text:
+            raise RuntimeError("Production macro source-copy stage no longer reaches output setup")
+        text = text.replace(
+            source_copy_complete,
+            '''  if (sourceCopyId != javaSuppliedSourceCopyId) {
+    exit("Error: Java source-copy bridge was not adopted");
+  }
+  File.append("STAGE 1 Java source copy accepted", testLog);
+''' + source_copy_complete,
+            1,
+        )
+
     if 'suppliedMuscleChannel = getJavaArgumentValue("muscle-channel");' in text:
         welcome_pattern = re.compile(
             r'  suppliedMuscleChannel = getJavaArgumentValue\("muscle-channel"\);.*?'
@@ -239,8 +274,14 @@ def check(macro: Path) -> None:
         supplied_channels=True,
     )
     for marker in (
+        "var javaArgument = getArgument();",
         'javaArgument = "image-id=" + getImageID() + ";muscle-channel=1;nerve-channel=2;channels-canonical=1";',
         "STAGE 1 Java channels supplied",
+        'javaArgument = javaArgument + ";source-copy-id=" + javaSuppliedSourceCopyId;',
+        'if (indexOf(javaArgument, ";muscle-channel=1;nerve-channel=2;channels-canonical=1;source-copy-id=") < 0) {',
+        "STAGE 1 Java source copy argument preserved",
+        "STAGE 1 Java source copy supplied",
+        "STAGE 1 Java source copy accepted",
         'suppliedMuscleChannel = getJavaArgumentValue("muscle-channel");',
         'setAutoThreshold("Default dark")',
         "STAGE 6 segmentation accepted",
@@ -248,6 +289,8 @@ def check(macro: Path) -> None:
     ):
         if marker not in bridge:
             raise AssertionError(f"Generated Java-bridge harness is missing {marker!r}")
+    if "0;source-copy-id=" in bridge:
+        raise AssertionError("Generated Java-bridge harness regressed to local 0;source-copy-id argument scope")
     print("Runtime harness generation check passed")
 
 

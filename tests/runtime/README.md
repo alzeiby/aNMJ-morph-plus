@@ -44,6 +44,8 @@ After building the Maven JAR, the focused Java smoke uses the Java runtime and S
 
 This verifies the built JAR can load and register against the exact Fiji runtime used by CI; the numerical oracle remains the authoritative guard for the macro-owned scientific workflow.
 
+The fresh-Fiji suite also runs two headless source-copy bridge fail-closed probes using a tiny native TIFF fixture. One supplies an unresolved `source-copy-id`; the other supplies an open image whose title does not match the required `__aNMJ_source_<id>` title. Both execute the production macro parser, require the exact `Error: Invalid source-copy-id supplied by Java` exit branch, prove the legacy fallback duplicate was not entered, and verify the pinned Fiji runtime is fully cleaned up afterward.
+
 ## Pinned NMJ_1 numerical oracle
 
 `nmj1_numeric_baseline.json` pins the automated `NMJ_1.lsm` seven-stage output. It records the reference-image SHA-256, the normalized production-macro SHA-256, the deterministic automation choices, the runtime stack used to capture the baseline, and expected values with explicit absolute tolerances for key measurements and connectivity counts.
