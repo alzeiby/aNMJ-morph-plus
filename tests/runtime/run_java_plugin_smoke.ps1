@@ -32,6 +32,7 @@ $separator = [IO.Path]::PathSeparator
 Copy-Item -LiteralPath $PluginJar -Destination $installedPlugin
 try {
     $classpath = @(
+        $installedPlugin,
         (Join-Path $FijiRoot 'jars\*'),
         (Join-Path $FijiRoot 'plugins\*'),
         $workDir

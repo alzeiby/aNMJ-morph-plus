@@ -15,6 +15,7 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
     private final Function<Path, ImagePlus> imageLoader;
     private final Consumer<ImagePlus> imagePresenter;
     private final Function<String, String> macroRunner;
+    private final StructuralNormalizer structuralNormalizer;
 
     LegacyBatchFileProcessor() {
         final ImageLoader loader = new ImageLoader();
@@ -22,23 +23,26 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
         this.imageLoader = loader::load;
         this.imagePresenter = ImagePlus::show;
         this.macroRunner = macro::runForResult;
+        this.structuralNormalizer = new StructuralNormalizer();
     }
 
     LegacyBatchFileProcessor(
         final Function<Path, ImagePlus> imageLoader,
         final Consumer<ImagePlus> imagePresenter,
-        final Function<String, String> macroRunner
+        final Function<String, String> macroRunner,
+        final StructuralNormalizer structuralNormalizer
     ) {
         this.imageLoader = Objects.requireNonNull(imageLoader, "imageLoader");
         this.imagePresenter = Objects.requireNonNull(imagePresenter, "imagePresenter");
         this.macroRunner = Objects.requireNonNull(macroRunner, "macroRunner");
+        this.structuralNormalizer = Objects.requireNonNull(structuralNormalizer, "structuralNormalizer");
     }
 
     @Override
     public void process(final Path path, final BatchChoiceResolver choices) {
         final Set<Integer> existingImageIds = currentImageIds();
         try {
-            final ImagePlus image;
+            ImagePlus image;
             try {
                 image = imageLoader.apply(path);
             } catch (ImageLoadingException e) {
@@ -55,20 +59,28 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
                 throw BatchFileException.precheck("T_GT_1", InputWorkflowRunner.TIME_SERIES_ERROR);
             }
 
-            imagePresenter.accept(image);
-
             final SupportedImageFormat format = SupportedImageFormat.fromName(path.getFileName().toString())
                 .orElseThrow(() -> BatchFileException.precheck("UNSUPPORTED_FORMAT", "Unsupported image format"));
 
-            BatchChoiceResolver.TwoPlaneChoice twoPlaneChoice = null;
-            int effectiveChannels = shape.channels();
-            if (normalization == InputNormalization.RGB_TO_CHANNELS) {
-                effectiveChannels = 3;
-            } else if (normalization == InputNormalization.CHOOSE_TWO_PLANE_INTERPRETATION) {
+            TwoPlaneInterpretation twoPlaneChoice = null;
+            boolean presented = false;
+            if (normalization == InputNormalization.CHOOSE_TWO_PLANE_INTERPRETATION) {
+                imagePresenter.accept(image);
+                presented = true;
                 final InputSignature twoPlaneSignature = InputSignature.of(format, shape, normalization, null);
                 twoPlaneChoice = choices.resolveTwoPlane(twoPlaneSignature);
-                effectiveChannels = twoPlaneChoice == BatchChoiceResolver.TwoPlaneChoice.CHANNELS ? 2 : 1;
             }
+            final ImagePlus normalized = structuralNormalizer.normalize(image, twoPlaneChoice);
+            if (normalized != image) {
+                image.changes = false;
+                image.close();
+                image = normalized;
+                presented = false;
+            }
+            if (!presented) {
+                imagePresenter.accept(image);
+            }
+            final int effectiveChannels = image.getNChannels();
 
             if (effectiveChannels < 2) {
                 image.close();
@@ -83,7 +95,7 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
             final BatchChoiceResolver.ChannelChoice channelChoice =
                 choices.resolveChannels(channelSignature, effectiveChannels);
 
-            final String argument = buildMacroArgument(image, channelChoice, twoPlaneChoice);
+            final String argument = buildMacroArgument(image, channelChoice);
             final String result;
             try {
                 result = macroRunner.apply(argument);
@@ -100,17 +112,12 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
 
     static String buildMacroArgument(
         final ImagePlus image,
-        final BatchChoiceResolver.ChannelChoice channelChoice,
-        final BatchChoiceResolver.TwoPlaneChoice twoPlaneChoice
+        final BatchChoiceResolver.ChannelChoice channelChoice
     ) {
         final StringBuilder argument = new StringBuilder()
             .append("image-id=").append(image.getID())
             .append(";muscle-channel=").append(channelChoice.muscleEndplateChannel())
             .append(";nerve-channel=").append(channelChoice.nerveTerminalChannel());
-        if (twoPlaneChoice != null) {
-            argument.append(";two-plane=")
-                .append(twoPlaneChoice == BatchChoiceResolver.TwoPlaneChoice.CHANNELS ? "channels" : "z-stack");
-        }
         return argument.toString();
     }
 

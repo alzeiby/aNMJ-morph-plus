@@ -8,11 +8,6 @@ import java.util.Objects;
 
 final class BatchChoiceResolver {
 
-    enum TwoPlaneChoice {
-        CHANNELS,
-        Z_STACK
-    }
-
     static final class ChannelChoice {
         private final int muscleEndplateChannel;
         private final int nerveTerminalChannel;
@@ -50,7 +45,7 @@ final class BatchChoiceResolver {
     }
 
     interface Prompter {
-        PromptResult<TwoPlaneChoice> promptTwoPlane(InputSignature signature);
+        PromptResult<TwoPlaneInterpretation> promptTwoPlane(InputSignature signature);
         PromptResult<ChannelChoice> promptChannels(InputSignature signature, int channelCount);
     }
 
@@ -71,17 +66,17 @@ final class BatchChoiceResolver {
         this.prompter = Objects.requireNonNull(prompter, "prompter");
     }
 
-    TwoPlaneChoice resolveTwoPlane(final InputSignature signature) {
+    TwoPlaneInterpretation resolveTwoPlane(final InputSignature signature) {
         final String key = "two-plane|" + signature.value();
         final String remembered = session.choices.get(key);
         if (remembered != null) {
             try {
-                return TwoPlaneChoice.valueOf(remembered);
+                return TwoPlaneInterpretation.valueOf(remembered);
             } catch (IllegalArgumentException e) {
                 throw new BatchCheckpointStore.BatchCheckpointException("Malformed remembered two-plane choice", e);
             }
         }
-        final PromptResult<TwoPlaneChoice> result = prompter.promptTwoPlane(signature);
+        final PromptResult<TwoPlaneInterpretation> result = prompter.promptTwoPlane(signature);
         if (result == null || result.value() == null) {
             throw BatchFileException.cancelled("Two-plane interpretation was cancelled");
         }
@@ -139,7 +134,7 @@ final class BatchChoiceResolver {
     static Prompter interactivePrompter() {
         return new Prompter() {
             @Override
-            public PromptResult<TwoPlaneChoice> promptTwoPlane(final InputSignature signature) {
+            public PromptResult<TwoPlaneInterpretation> promptTwoPlane(final InputSignature signature) {
                 final GenericDialog dialog = new GenericDialog("Two-plane image detected");
                 dialog.addMessage(
                     "This image contains one channel and two planes. Choose how the two planes should be interpreted."
@@ -154,9 +149,9 @@ final class BatchChoiceResolver {
                 if (dialog.wasCanceled()) {
                     return null;
                 }
-                final TwoPlaneChoice choice = dialog.getNextChoiceIndex() == 0
-                    ? TwoPlaneChoice.CHANNELS
-                    : TwoPlaneChoice.Z_STACK;
+                final TwoPlaneInterpretation choice = dialog.getNextChoiceIndex() == 0
+                    ? TwoPlaneInterpretation.CHANNELS
+                    : TwoPlaneInterpretation.Z_STACK;
                 return new PromptResult<>(choice, dialog.getNextBoolean());
             }
 

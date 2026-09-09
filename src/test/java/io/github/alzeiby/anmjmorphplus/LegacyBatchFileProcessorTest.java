@@ -1,7 +1,11 @@
 package io.github.alzeiby.anmjmorphplus;
 
 import ij.IJ;
+import ij.CompositeImage;
 import ij.ImagePlus;
+import ij.ImageStack;
+import ij.io.FileInfo;
+import ij.process.ByteProcessor;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -28,7 +32,8 @@ public class LegacyBatchFileProcessorTest {
         final LegacyBatchFileProcessor processor = new LegacyBatchFileProcessor(
             path -> image,
             ignored -> presented.set(true),
-            argument -> { macroRan.set(true); return null; }
+            argument -> { macroRan.set(true); return null; },
+            new StructuralNormalizer()
         );
 
         final BatchFileException error = assertThrows(
@@ -49,7 +54,8 @@ public class LegacyBatchFileProcessorTest {
         final LegacyBatchFileProcessor processor = new LegacyBatchFileProcessor(
             path -> image,
             ignored -> { },
-            value -> { argument.set(value); return null; }
+            value -> { argument.set(value); return null; },
+            new StructuralNormalizer()
         );
 
         processor.process(Path.of("sample.tif"), resolver());
@@ -65,7 +71,8 @@ public class LegacyBatchFileProcessorTest {
         final LegacyBatchFileProcessor processor = new LegacyBatchFileProcessor(
             path -> image,
             ignored -> { },
-            argument -> "[aborted]"
+            argument -> "[aborted]",
+            new StructuralNormalizer()
         );
 
         final BatchFileException error = assertThrows(
@@ -78,23 +85,152 @@ public class LegacyBatchFileProcessorTest {
     }
 
     @Test
-    public void ambiguousTwoPlaneChoiceIsPassedBackToMacro() throws Exception {
+    public void ambiguousTwoPlaneChannelsAreNormalizedBeforeMacro() throws Exception {
         final ImagePlus image = IJ.createHyperStack("two-plane.tif", 8, 8, 1, 2, 1, 8);
         final AtomicReference<String> argument = new AtomicReference<>();
         final LegacyBatchFileProcessor processor = new LegacyBatchFileProcessor(
             path -> image,
             ignored -> { },
-            value -> { argument.set(value); return null; }
+            value -> { argument.set(value); return null; },
+            new StructuralNormalizer()
         );
 
         processor.process(Path.of("two-plane.tif"), resolver());
 
-        assertTrue(argument.get().contains("two-plane=channels"));
+        assertEquals(2, image.getNChannels());
+        assertEquals(1, image.getNSlices());
+        assertFalse(argument.get().contains("two-plane="));
         assertTrue(argument.get().contains("muscle-channel=1"));
         assertTrue(argument.get().contains("nerve-channel=2"));
     }
 
+    @Test
+    public void ambiguousTwoPlaneZReplacementIsPresentedBeforeSingleChannelPrecheck() throws Exception {
+        final ImageStack stack = new ImageStack(1, 1);
+        stack.addSlice(new ByteProcessor(1, 1, new byte[] {31}, null));
+        stack.addSlice(new ByteProcessor(1, 1, new byte[] {17}, null));
+        final AtomicBoolean originalClosed = new AtomicBoolean(false);
+        final ImagePlus image = new ImagePlus("two-plane-z.tif", stack) {
+            @Override
+            public void close() {
+                originalClosed.set(true);
+                super.close();
+            }
+        };
+        image.setDimensions(1, 2, 1);
+        image.setOpenAsHyperStack(true);
+        final java.util.List<ImagePlus> presented = new java.util.ArrayList<>();
+        final AtomicBoolean macroRan = new AtomicBoolean(false);
+        final LegacyBatchFileProcessor processor = new LegacyBatchFileProcessor(
+            path -> image,
+            presented::add,
+            argument -> { macroRan.set(true); return null; },
+            new StructuralNormalizer()
+        );
+
+        final BatchFileException error = assertThrows(
+            BatchFileException.class,
+            () -> processor.process(Path.of("two-plane-z.tif"), resolver(TwoPlaneInterpretation.Z_STACK))
+        );
+
+        assertEquals(BatchFileException.Kind.PRECHECK, error.kind());
+        assertEquals("INVALID_CHANNEL_SELECTION", error.reasonCode());
+        assertEquals(2, presented.size());
+        assertTrue(presented.get(0) == image);
+        assertTrue(presented.get(1) != image);
+        assertEquals(1, presented.get(1).getNChannels());
+        assertEquals(1, presented.get(1).getNSlices());
+        assertEquals(31, presented.get(1).getProcessor().get(0, 0));
+        assertTrue(originalClosed.get());
+        assertFalse(macroRan.get());
+    }
+
+    @Test
+    public void rgbIsPresentedAsThreeChannelCompositeBeforeMacro() throws Exception {
+        final AtomicBoolean originalClosed = new AtomicBoolean(false);
+        final ImagePlus base = IJ.createImage("rgb.png", "RGB black", 2, 1, 1);
+        final ImagePlus rgb = new ImagePlus(base.getTitle(), base.getProcessor()) {
+            @Override
+            public void close() {
+                originalClosed.set(true);
+                super.close();
+            }
+        };
+        rgb.getProcessor().set(0, 0, 0xff123456);
+        rgb.getProcessor().set(1, 0, 0xffa1b2c3);
+        final AtomicReference<ImagePlus> presented = new AtomicReference<>();
+        final AtomicReference<String> argument = new AtomicReference<>();
+        final LegacyBatchFileProcessor processor = new LegacyBatchFileProcessor(
+            path -> rgb,
+            presented::set,
+            value -> { argument.set(value); return null; },
+            new StructuralNormalizer()
+        );
+
+        processor.process(Path.of("rgb.png"), resolver());
+
+        final ImagePlus normalized = presented.get();
+        assertTrue(normalized != rgb);
+        assertTrue(originalClosed.get());
+        assertTrue(normalized instanceof CompositeImage);
+        assertEquals(3, normalized.getNChannels());
+        assertEquals(0x12, normalized.getStack().getProcessor(1).get(0, 0));
+        assertEquals(0x34, normalized.getStack().getProcessor(2).get(0, 0));
+        assertEquals(0x56, normalized.getStack().getProcessor(3).get(0, 0));
+        assertTrue(argument.get().contains("image-id=" + normalized.getID()));
+        assertFalse(argument.get().contains("two-plane="));
+    }
+
+    @Test
+    public void multichannelZIsMaximumProjectedBeforeMacro() throws Exception {
+        final ImageStack stack = new ImageStack(1, 1);
+        stack.addSlice(new ByteProcessor(1, 1, new byte[] {3}, null));
+        stack.addSlice(new ByteProcessor(1, 1, new byte[] {20}, null));
+        stack.addSlice(new ByteProcessor(1, 1, new byte[] {9}, null));
+        stack.addSlice(new ByteProcessor(1, 1, new byte[] {7}, null));
+        final AtomicBoolean originalClosed = new AtomicBoolean(false);
+        final ImagePlus image = new ImagePlus("z.lsm", stack) {
+            @Override
+            public void close() {
+                originalClosed.set(true);
+                super.close();
+            }
+        };
+        image.setDimensions(2, 2, 1);
+        image.setOpenAsHyperStack(true);
+        final FileInfo fileInfo = new FileInfo();
+        fileInfo.fileName = "z.lsm";
+        fileInfo.directory = "C:\\source data\\";
+        image.setFileInfo(fileInfo);
+        final AtomicReference<ImagePlus> presented = new AtomicReference<>();
+        final AtomicReference<String> argument = new AtomicReference<>();
+        final LegacyBatchFileProcessor processor = new LegacyBatchFileProcessor(
+            path -> image,
+            presented::set,
+            value -> { argument.set(value); return null; },
+            new StructuralNormalizer()
+        );
+
+        processor.process(Path.of("z.lsm"), resolver());
+
+        final ImagePlus normalized = presented.get();
+        assertTrue(normalized != image);
+        assertTrue(originalClosed.get());
+        assertEquals(2, normalized.getNChannels());
+        assertEquals(1, normalized.getNSlices());
+        assertEquals(9, normalized.getStack().getProcessor(1).get(0, 0));
+        assertEquals(20, normalized.getStack().getProcessor(2).get(0, 0));
+        assertEquals("z.lsm", normalized.getTitle());
+        assertEquals("z.lsm", normalized.getOriginalFileInfo().fileName);
+        assertEquals("C:\\source data\\", normalized.getOriginalFileInfo().directory);
+        assertTrue(argument.get().contains("image-id=" + normalized.getID()));
+    }
+
     private BatchChoiceResolver resolver() throws Exception {
+        return resolver(TwoPlaneInterpretation.CHANNELS);
+    }
+
+    private BatchChoiceResolver resolver(final TwoPlaneInterpretation twoPlaneInterpretation) throws Exception {
         final Path root = temporaryFolder.newFolder().toPath();
         final BatchCheckpointStore store = new BatchCheckpointStore();
         return new BatchChoiceResolver(
@@ -103,8 +239,8 @@ public class LegacyBatchFileProcessorTest {
             store.load(root),
             new BatchChoiceResolver.Prompter() {
                 @Override
-                public BatchChoiceResolver.PromptResult<BatchChoiceResolver.TwoPlaneChoice> promptTwoPlane(final InputSignature signature) {
-                    return new BatchChoiceResolver.PromptResult<>(BatchChoiceResolver.TwoPlaneChoice.CHANNELS, false);
+                public BatchChoiceResolver.PromptResult<TwoPlaneInterpretation> promptTwoPlane(final InputSignature signature) {
+                    return new BatchChoiceResolver.PromptResult<>(twoPlaneInterpretation, false);
                 }
 
                 @Override

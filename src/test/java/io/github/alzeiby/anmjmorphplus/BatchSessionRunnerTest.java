@@ -253,7 +253,7 @@ public class BatchSessionRunnerTest {
             processor,
             new BatchChoiceResolver.Prompter() {
                 @Override
-                public BatchChoiceResolver.PromptResult<BatchChoiceResolver.TwoPlaneChoice> promptTwoPlane(final InputSignature signature) {
+                public BatchChoiceResolver.PromptResult<TwoPlaneInterpretation> promptTwoPlane(final InputSignature signature) {
                     throw new AssertionError("fake processor should not prompt");
                 }
 
