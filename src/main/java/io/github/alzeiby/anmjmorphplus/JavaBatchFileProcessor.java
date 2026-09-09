@@ -12,17 +12,14 @@ import java.util.function.BiConsumer;
 final class JavaBatchFileProcessor implements BiConsumer<Path, BatchChoiceResolver> {
 
     private final ImageLoader imageLoader = new ImageLoader();
-    private final StructuralNormalizer structuralNormalizer = new StructuralNormalizer();
-    private final ChannelRoleCanonicalizer channelRoleCanonicalizer = new ChannelRoleCanonicalizer();
-    private final AnalysisWorkflow analysisWorkflow = new AnalysisWorkflow();
-    private final CsvOutputWriter outputWriter = new CsvOutputWriter();
+    private final SingleImageAnalysisRunner analysisRunner = new SingleImageAnalysisRunner();
 
     @Override
     public void accept(final Path path, final BatchChoiceResolver choices) {
         final Set<Integer> existingImageIds = currentImageIds();
         try {
             ImagePlus image = load(path);
-            final InputNormalization normalization = InputPolicy.normalizationFor(image);
+            final InputNormalization normalization = StructuralNormalizer.normalizationFor(image);
             if (normalization == InputNormalization.REJECT_TIME_SERIES) {
                 image.close();
                 throw BatchFileException.precheck("T_GT_1", InputWorkflowRunner.TIME_SERIES_ERROR);
@@ -39,13 +36,7 @@ final class JavaBatchFileProcessor implements BiConsumer<Path, BatchChoiceResolv
             final String interpretation = twoPlaneChoice == null ? null : twoPlaneChoice.name();
             final String channelSignature = BatchChoiceResolver.signature(format, image, normalization, interpretation);
 
-            final ImagePlus normalized = structuralNormalizer.normalize(image, twoPlaneChoice);
-            if (normalized != image) {
-                image.changes = false;
-                image.close();
-                image = normalized;
-            }
-            image.show();
+            image = analysisRunner.normalizeAndPresent(image, twoPlaneChoice, true);
 
             final int channelCount = image.getNChannels();
             if (channelCount < 2) {
@@ -64,20 +55,13 @@ final class JavaBatchFileProcessor implements BiConsumer<Path, BatchChoiceResolv
             BatchChoiceResolver.ChannelChoice analysisChoice = selected;
             boolean channelsCanonical = false;
             if (channelCount <= ChannelRoleCanonicalizer.IMAGEJ_ARRANGER_MAX_CHANNELS) {
-                final ImagePlus canonical = channelRoleCanonicalizer.canonicalize(image, selected);
-                if (canonical != image) {
-                    image = canonical;
-                    image.show();
-                }
+                image = analysisRunner.canonicalizeSelected(image, selected);
                 analysisChoice = new BatchChoiceResolver.ChannelChoice(1, 2);
                 channelsCanonical = image.getNChannels() == 2 && image.isComposite();
             }
 
-            final AnalysisRun run;
             try {
-                run = analysisWorkflow.analyze(image, path, analysisChoice, channelsCanonical);
-                outputWriter.append(AnalysisOutputPaths.forInput(path).csv, run.result);
-                analysisWorkflow.finish(run);
+                analysisRunner.analyzeCanonical(image, path, analysisChoice, channelsCanonical);
             } catch (AnalysisCancelledException e) {
                 throw BatchFileException.cancelled("Analysis was cancelled");
             } catch (BatchFileException e) {

@@ -17,6 +17,7 @@ import ij.plugin.tool.BrushTool;
 import java.awt.Color;
 import java.awt.Window;
 import java.nio.file.Path;
+import java.util.function.Consumer;
 
 final class AnalysisWorkflow {
 
@@ -42,11 +43,12 @@ final class AnalysisWorkflow {
         this.prompter = prompter;
     }
 
-    AnalysisRun analyze(
+    void analyze(
         final ImagePlus image,
         final Path inputPath,
         final BatchChoiceResolver.ChannelChoice channelChoice,
-        final boolean channelsCanonical
+        final boolean channelsCanonical,
+        final Consumer<AnalysisResult> resultConsumer
     ) {
         final AnalysisOutputPaths paths = AnalysisOutputPaths.forInput(inputPath);
         paths.ensureCleanedDirectory();
@@ -107,7 +109,7 @@ final class AnalysisWorkflow {
 
         IJ.run("Set Measurements...", "area mean min perimeter feret's redirect=None decimal=8");
         IJ.run(original.nerve, "Create Selection", "");
-        final Measurement nerveMeasurement = measure(original.nerve);
+        final AnalysisResult.Measurement nerveMeasurement = measure(original.nerve);
 
         IJ.run(original.nerve, "Make Binary", "thresholded remaining black");
         IJ.run(original.nerve, "Convert to Mask", "");
@@ -123,19 +125,19 @@ final class AnalysisWorkflow {
         closeImage(original.nerve);
 
         IJ.run(original.muscle, "Create Selection", "");
-        final Measurement achrMeasurement = measure(original.muscle);
+        final AnalysisResult.Measurement achrMeasurement = measure(original.muscle);
         makeCurrent(original.muscle);
         IJ.run(original.muscle, "Subtract Background...", "rolling=50 create");
         final ImagePlus intermediate = original.muscle;
         IJ.run(intermediate, "Make Binary", "thresholded remaining black");
         IJ.run(intermediate, "Create Selection", "");
-        final Measurement endplateMeasurement = measure(intermediate);
+        final AnalysisResult.Measurement endplateMeasurement = measure(intermediate);
         IJ.saveAs(intermediate, "Tiff", paths.endplateIntermediate.toString());
         closeImage(intermediate);
         closeImage(original.muscle);
 
-        final ImagePlus reopenedAxon = openTiff(paths.axon, paths.axon.getFileName().toString());
-        final ImagePlus reopenedEndplate = openTiff(paths.endplate, paths.endplate.getFileName().toString());
+        final ImagePlus reopenedAxon = openTiff(paths.axon);
+        final ImagePlus reopenedEndplate = openTiff(paths.endplate);
         IJ.run(reopenedEndplate, "Invert", "");
         final Concatenator overlapConcatenator = new Concatenator();
         overlapConcatenator.setIm5D(false);
@@ -149,7 +151,7 @@ final class AnalysisWorkflow {
         overlapAverage.show();
         IJ.run(overlapAverage, "Make Binary", "");
         IJ.run(overlapAverage, "Create Selection", "");
-        final Measurement unoccupiedMeasurement = measure(overlapAverage);
+        final AnalysisResult.Measurement unoccupiedMeasurement = measure(overlapAverage);
         clearResults();
         closeImage(overlapConcat);
         closeImage(overlapAverage);
@@ -164,10 +166,7 @@ final class AnalysisWorkflow {
         final boolean imageAlright = prompter.confirmSegmentation(SCREEN6);
         IJ.run(segmented, "Fill Holes", "");
 
-        final ImagePlus reopenedIntermediate = openTiff(
-            paths.endplateIntermediate,
-            paths.endplateIntermediate.getFileName().toString()
-        );
+        final ImagePlus reopenedIntermediate = openTiff(paths.endplateIntermediate);
         final Concatenator stage6Concatenator = new Concatenator();
         stage6Concatenator.setIm5D(true);
         final ImagePlus finalConcat = stage6Concatenator.concatenate(
@@ -196,35 +195,27 @@ final class AnalysisWorkflow {
             pixelSizeY,
             sizeUnit,
             inputPath.getFileName().toString(),
-            thresholdNerve,
-            thresholdEndplate,
+            thresholdNerve + "/" + thresholdEndplate,
             axonDiameter,
-            nerveMeasurement.perimeter,
-            nerveMeasurement.area,
             counts0,
             counts2,
             counts4,
             counts5,
             totalLengthOfBranches,
-            achrMeasurement.perimeter,
-            achrMeasurement.area,
-            endplateMeasurement.feret,
-            endplateMeasurement.perimeter,
-            endplateMeasurement.area,
-            unoccupiedMeasurement.area,
+            nerveMeasurement,
+            achrMeasurement,
+            endplateMeasurement,
+            unoccupiedMeasurement,
             imageAlright,
             numberOfClusters
         );
-        return new AnalysisRun(result, finalConcat, finalAverage);
-    }
-
-    void finish(final AnalysisRun run) {
+        resultConsumer.accept(result);
         prompter.review(
-            run.finalAverage,
+            finalAverage,
             "7/7 Congratulations- 'aNMJ-morph is now complete! \n-\nPress OK. \nImages will be closed down and measurements will be saved onto a raw_data_table document."
         );
-        closeImage(run.finalConcatenated);
-        closeImage(run.finalAverage);
+        closeImage(finalConcat);
+        closeImage(finalAverage);
     }
 
     private static ImagePlus duplicate(final ImagePlus source, final String title) {
@@ -259,7 +250,7 @@ final class AnalysisWorkflow {
         return new Channels(muscle, nerve);
     }
 
-    private static Measurement measure(final ImagePlus image) {
+    private static AnalysisResult.Measurement measure(final ImagePlus image) {
         final ResultsTable table = Analyzer.getResultsTable();
         final int before = table.size();
         IJ.run(image, "Measure", "");
@@ -267,7 +258,7 @@ final class AnalysisWorkflow {
             throw new IllegalStateException("ImageJ Measure did not append a Results row");
         }
         final int row = table.size() - 1;
-        return new Measurement(
+        return new AnalysisResult.Measurement(
             table.getValue("Area", row),
             table.getValue("Perim.", row),
             table.getValue("Feret", row)
@@ -293,12 +284,12 @@ final class AnalysisWorkflow {
         return summary.getValue("Count", summary.size() - 1);
     }
 
-    private static ImagePlus openTiff(final Path path, final String title) {
+    private static ImagePlus openTiff(final Path path) {
         final ImagePlus image = IJ.openImage(path.toString());
         if (image == null) {
             throw new IllegalStateException("Could not open intermediate TIFF: " + path);
         }
-        image.setTitle(title);
+        image.setTitle(path.getFileName().toString());
         image.show();
         makeCurrent(image);
         return image;
@@ -347,19 +338,11 @@ final class AnalysisWorkflow {
     }
 
     private void installPaintbrush(final int width) {
-        final Toolbar toolbar = Toolbar.getInstance();
-        if (toolbar == null) {
-            throw new IllegalStateException("ImageJ toolbar is unavailable");
-        }
         // Use ImageJ's built-in paintbrush PlugInTool directly. The legacy macro's
         // Paintbrush Tool Options command belongs to StartupMacros and is not guaranteed
         // to be installed in a clean Fiji runtime.
-        if (!isOurPaintbrushSelected(toolbar)) {
-            new BrushTool().run("");
-            paintbrushToolId = Toolbar.getToolId();
-        }
-        BrushTool.setBrushWidth(width);
         selectPaintbrush();
+        BrushTool.setBrushWidth(width);
     }
 
     private void selectPaintbrush() {
@@ -380,14 +363,6 @@ final class AnalysisWorkflow {
         if (!(Toolbar.getPlugInTool() instanceof BrushTool)) {
             throw new IllegalStateException("ImageJ Paintbrush Tool could not be installed");
         }
-    }
-
-    private boolean isOurPaintbrushSelected(final Toolbar toolbar) {
-        if (paintbrushToolId < 0) {
-            return false;
-        }
-        toolbar.setTool(paintbrushToolId);
-        return Toolbar.getPlugInTool() instanceof BrushTool;
     }
 
     private static void closeWindow(final String title) {
@@ -411,18 +386,6 @@ final class AnalysisWorkflow {
         Channels(final ImagePlus muscle, final ImagePlus nerve) {
             this.muscle = muscle;
             this.nerve = nerve;
-        }
-    }
-
-    private static final class Measurement {
-        final double area;
-        final double perimeter;
-        final double feret;
-
-        Measurement(final double area, final double perimeter, final double feret) {
-            this.area = area;
-            this.perimeter = perimeter;
-            this.feret = feret;
         }
     }
 

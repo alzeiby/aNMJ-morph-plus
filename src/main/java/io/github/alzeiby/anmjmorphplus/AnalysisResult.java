@@ -7,22 +7,17 @@ final class AnalysisResult {
     final double pixelSizeY;
     final String sizeUnit;
     final String inputTitle;
-    final String thresholdMethodNerveTerminal;
-    final String thresholdMethodEndplate;
+    final String thresholdMethods;
     final double axonDiameter;
-    final double nerveTerminalPerimeter;
-    final double nerveTerminalArea;
     final double counts0;
     final double counts2;
     final double counts4;
     final double counts5;
     final double totalLengthOfBranches;
-    final double achrPerimeter;
-    final double achrArea;
-    final double endplateDiameter;
-    final double endplatePerimeter;
-    final double endplateArea;
-    final double unoccupiedAchrArea;
+    final Measurement nerve;
+    final Measurement achr;
+    final Measurement endplate;
+    final Measurement unoccupied;
     final boolean imageAlright;
     final double numberOfClusters;
 
@@ -33,22 +28,17 @@ final class AnalysisResult {
         final double pixelSizeY,
         final String sizeUnit,
         final String inputTitle,
-        final String thresholdMethodNerveTerminal,
-        final String thresholdMethodEndplate,
+        final String thresholdMethods,
         final double axonDiameter,
-        final double nerveTerminalPerimeter,
-        final double nerveTerminalArea,
         final double counts0,
         final double counts2,
         final double counts4,
         final double counts5,
         final double totalLengthOfBranches,
-        final double achrPerimeter,
-        final double achrArea,
-        final double endplateDiameter,
-        final double endplatePerimeter,
-        final double endplateArea,
-        final double unoccupiedAchrArea,
+        final Measurement nerve,
+        final Measurement achr,
+        final Measurement endplate,
+        final Measurement unoccupied,
         final boolean imageAlright,
         final double numberOfClusters
     ) {
@@ -58,23 +48,30 @@ final class AnalysisResult {
         this.pixelSizeY = pixelSizeY;
         this.sizeUnit = sizeUnit;
         this.inputTitle = inputTitle;
-        this.thresholdMethodNerveTerminal = thresholdMethodNerveTerminal;
-        this.thresholdMethodEndplate = thresholdMethodEndplate;
+        this.thresholdMethods = thresholdMethods;
         this.axonDiameter = axonDiameter;
-        this.nerveTerminalPerimeter = nerveTerminalPerimeter;
-        this.nerveTerminalArea = nerveTerminalArea;
         this.counts0 = counts0;
         this.counts2 = counts2;
         this.counts4 = counts4;
         this.counts5 = counts5;
         this.totalLengthOfBranches = totalLengthOfBranches;
-        this.achrPerimeter = achrPerimeter;
-        this.achrArea = achrArea;
-        this.endplateDiameter = endplateDiameter;
-        this.endplatePerimeter = endplatePerimeter;
-        this.endplateArea = endplateArea;
-        this.unoccupiedAchrArea = unoccupiedAchrArea;
+        this.nerve = nerve;
+        this.achr = achr;
+        this.endplate = endplate;
+        this.unoccupied = unoccupied;
         this.imageAlright = imageAlright;
         this.numberOfClusters = numberOfClusters;
+    }
+
+    static final class Measurement {
+        final double area;
+        final double perimeter;
+        final double feret;
+
+        Measurement(final double area, final double perimeter, final double feret) {
+            this.area = area;
+            this.perimeter = perimeter;
+            this.feret = feret;
+        }
     }
 }

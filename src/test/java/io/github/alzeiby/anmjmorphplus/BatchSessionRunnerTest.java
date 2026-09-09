@@ -121,6 +121,21 @@ public class BatchSessionRunnerTest {
     }
 
     @Test
+    public void precheckFailureKeepsExactCheckpointStatusAndReason() throws Exception {
+        final Path root = temporaryFolder.newFolder("precheck").toPath();
+        touch(root.resolve("sample.tif"));
+        final BatchCheckpointStore store = new BatchCheckpointStore();
+
+        runner(root, store, (path, choices) -> {
+            throw BatchFileException.precheck("SYNTHETIC_PRECHECK", "synthetic precheck");
+        }).run();
+
+        final BatchCheckpointStore.FileRecord record = store.load(root).files.get("sample.tif");
+        assertEquals(BatchCheckpointStore.Status.FAILED_PRECHECK, record.status);
+        assertEquals("SYNTHETIC_PRECHECK", record.reasonCode);
+    }
+
+    @Test
     public void interruptedCommittedRunIsRecoveredWithoutDuplicateRow() throws Exception {
         final Path root = temporaryFolder.newFolder("recover").toPath();
         final Path input = touch(root.resolve("sample.tif"));
@@ -254,12 +269,12 @@ public class BatchSessionRunnerTest {
             processor,
             new BatchChoiceResolver.Prompter() {
                 @Override
-                public BatchChoiceResolver.PromptResult<TwoPlaneInterpretation> promptTwoPlane(final String signature) {
+                BatchChoiceResolver.PromptResult<TwoPlaneInterpretation> promptTwoPlane() {
                     throw new AssertionError("fake processor should not prompt");
                 }
 
                 @Override
-                public BatchChoiceResolver.PromptResult<BatchChoiceResolver.ChannelChoice> promptChannels(final String signature, final int channelCount) {
+                BatchChoiceResolver.PromptResult<BatchChoiceResolver.ChannelChoice> promptChannels(final int channelCount) {
                     throw new AssertionError("fake processor should not prompt");
                 }
             },

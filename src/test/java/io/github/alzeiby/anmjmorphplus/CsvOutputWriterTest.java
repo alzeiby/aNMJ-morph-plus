@@ -73,9 +73,12 @@ public class CsvOutputWriterTest {
     private static AnalysisResult result(final boolean accepted, final double clusters) {
         return new AnalysisResult(
             512, 512, 0.1317882255, 0.1317882255, "microns", "NMJ_1.lsm",
-            "Default", "Default", 1.31788226, 635.50525379, 452.57889814,
-            259923, 99, 139, 23, 292.70164895, 586.75552449, 432.90079961,
-            33.58609418, 107.30171646, 711.72886127, 4315.80853971, accepted, clusters
+            "Default/Default", 1.31788226, 259923, 99, 139, 23, 292.70164895,
+            new AnalysisResult.Measurement(452.57889814, 635.50525379, Double.NaN),
+            new AnalysisResult.Measurement(432.90079961, 586.75552449, Double.NaN),
+            new AnalysisResult.Measurement(711.72886127, 107.30171646, 33.58609418),
+            new AnalysisResult.Measurement(4315.80853971, Double.NaN, Double.NaN),
+            accepted, clusters
         );
     }
 

@@ -14,7 +14,7 @@ public class InputPolicyTest {
         image.setDimensions(1, 2, 3);
         assertEquals(
             InputNormalization.REJECT_TIME_SERIES,
-            InputPolicy.normalizationFor(image)
+            StructuralNormalizer.normalizationFor(image)
         );
     }
 
@@ -23,7 +23,7 @@ public class InputPolicyTest {
         final ImagePlus image = IJ.createImage("rgb", "RGB black", 16, 12, 1);
         assertEquals(
             InputNormalization.RGB_TO_CHANNELS,
-            InputPolicy.normalizationFor(image)
+            StructuralNormalizer.normalizationFor(image)
         );
     }
 
@@ -31,7 +31,7 @@ public class InputPolicyTest {
     public void preservesTheAmbiguousOneChannelTwoPlaneCase() {
         assertEquals(
             InputNormalization.CHOOSE_TWO_PLANE_INTERPRETATION,
-            InputPolicy.normalizationFor(IJ.createHyperStack("two-plane", 16, 12, 1, 2, 1, 8))
+            StructuralNormalizer.normalizationFor(IJ.createHyperStack("two-plane", 16, 12, 1, 2, 1, 8))
         );
     }
 
@@ -39,7 +39,7 @@ public class InputPolicyTest {
     public void identifiesRealZStacks() {
         assertEquals(
             InputNormalization.MAX_PROJECT_Z,
-            InputPolicy.normalizationFor(IJ.createHyperStack("z", 16, 12, 2, 3, 1, 8))
+            StructuralNormalizer.normalizationFor(IJ.createHyperStack("z", 16, 12, 2, 3, 1, 8))
         );
     }
 
@@ -47,7 +47,7 @@ public class InputPolicyTest {
     public void leavesOrdinaryMultiChannelImagesAlone() {
         assertEquals(
             InputNormalization.USE_AS_IS,
-            InputPolicy.normalizationFor(IJ.createHyperStack("ordinary", 16, 12, 2, 1, 1, 8))
+            StructuralNormalizer.normalizationFor(IJ.createHyperStack("ordinary", 16, 12, 2, 1, 1, 8))
         );
     }
 }

@@ -25,13 +25,13 @@ public class BatchChoiceResolverTest {
         final AtomicInteger planePrompts = new AtomicInteger();
         final BatchChoiceResolver.Prompter prompter = new BatchChoiceResolver.Prompter() {
             @Override
-            public BatchChoiceResolver.PromptResult<TwoPlaneInterpretation> promptTwoPlane(final String signature) {
+            BatchChoiceResolver.PromptResult<TwoPlaneInterpretation> promptTwoPlane() {
                 planePrompts.incrementAndGet();
                 return new BatchChoiceResolver.PromptResult<>(TwoPlaneInterpretation.CHANNELS, true);
             }
 
             @Override
-            public BatchChoiceResolver.PromptResult<BatchChoiceResolver.ChannelChoice> promptChannels(final String signature, final int channelCount) {
+            BatchChoiceResolver.PromptResult<BatchChoiceResolver.ChannelChoice> promptChannels(final int channelCount) {
                 final int count = channelPrompts.incrementAndGet();
                 return new BatchChoiceResolver.PromptResult<>(new BatchChoiceResolver.ChannelChoice(1, 2), count > 1);
             }
@@ -76,12 +76,12 @@ public class BatchChoiceResolverTest {
             store.load(root),
             new BatchChoiceResolver.Prompter() {
                 @Override
-                public BatchChoiceResolver.PromptResult<TwoPlaneInterpretation> promptTwoPlane(final String signature) {
+                BatchChoiceResolver.PromptResult<TwoPlaneInterpretation> promptTwoPlane() {
                     throw new AssertionError("not used");
                 }
 
                 @Override
-                public BatchChoiceResolver.PromptResult<BatchChoiceResolver.ChannelChoice> promptChannels(final String signature, final int channelCount) {
+                BatchChoiceResolver.PromptResult<BatchChoiceResolver.ChannelChoice> promptChannels(final int channelCount) {
                     prompts.incrementAndGet();
                     return new BatchChoiceResolver.PromptResult<>(new BatchChoiceResolver.ChannelChoice(1, 2), true);
                 }
@@ -105,12 +105,12 @@ public class BatchChoiceResolverTest {
             store.load(root),
             new BatchChoiceResolver.Prompter() {
                 @Override
-                public BatchChoiceResolver.PromptResult<TwoPlaneInterpretation> promptTwoPlane(final String signature) {
+                BatchChoiceResolver.PromptResult<TwoPlaneInterpretation> promptTwoPlane() {
                     throw new AssertionError("not used");
                 }
 
                 @Override
-                public BatchChoiceResolver.PromptResult<BatchChoiceResolver.ChannelChoice> promptChannels(final String signature, final int channelCount) {
+                BatchChoiceResolver.PromptResult<BatchChoiceResolver.ChannelChoice> promptChannels(final int channelCount) {
                     prompts.incrementAndGet();
                     return new BatchChoiceResolver.PromptResult<>(new BatchChoiceResolver.ChannelChoice(1, 2), true);
                 }
@@ -148,14 +148,14 @@ public class BatchChoiceResolverTest {
         );
     }
 
-    private static final class FailingPrompter implements BatchChoiceResolver.Prompter {
+    private static final class FailingPrompter extends BatchChoiceResolver.Prompter {
         @Override
-        public BatchChoiceResolver.PromptResult<TwoPlaneInterpretation> promptTwoPlane(final String signature) {
+        BatchChoiceResolver.PromptResult<TwoPlaneInterpretation> promptTwoPlane() {
             throw new AssertionError("remembered two-plane choice should be reused");
         }
 
         @Override
-        public BatchChoiceResolver.PromptResult<BatchChoiceResolver.ChannelChoice> promptChannels(final String signature, final int channelCount) {
+        BatchChoiceResolver.PromptResult<BatchChoiceResolver.ChannelChoice> promptChannels(final int channelCount) {
             throw new AssertionError("remembered channel choice should be reused");
         }
     }
