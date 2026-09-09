@@ -86,12 +86,22 @@ run("Quit");
 '''
     text = replace_once(text, dispatch_pattern, dispatch, "top-level dispatch")
 
-    welcome_pattern = re.compile(
-        r'  Dialog\.create\("Welcome"\);.*?'
-        r'  if \(nerveTerminalChannel == -1\) \{\s*'
-        r'exit\("Error: No nerve terminal channel was selected"\);\s*\}\s*',
-        re.DOTALL,
-    )
+    if 'suppliedMuscleChannel = getJavaArgumentValue("muscle-channel");' in text:
+        welcome_pattern = re.compile(
+            r'  suppliedMuscleChannel = getJavaArgumentValue\("muscle-channel"\);.*?'
+            r'  if \(muscleEndplateChannel < 1 \|\| muscleEndplateChannel > numberOfChannels \|\|\s*'
+            r'nerveTerminalChannel < 1 \|\| nerveTerminalChannel > numberOfChannels \|\|\s*'
+            r'muscleEndplateChannel == nerveTerminalChannel\) \{\s*'
+            r'exit\("Error: Invalid muscle endplate/nerve terminal channel selection"\);\s*\}\s*',
+            re.DOTALL,
+        )
+    else:
+        welcome_pattern = re.compile(
+            r'  Dialog\.create\("Welcome"\);.*?'
+            r'  if \(nerveTerminalChannel == -1\) \{\s*'
+            r'exit\("Error: No nerve terminal channel was selected"\);\s*\}\s*',
+            re.DOTALL,
+        )
     text = replace_once(
         text,
         welcome_pattern,

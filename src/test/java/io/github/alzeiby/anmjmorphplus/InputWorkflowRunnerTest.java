@@ -13,6 +13,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
 public class InputWorkflowRunnerTest {
 
@@ -27,6 +28,7 @@ public class InputWorkflowRunnerTest {
             path -> { throw new AssertionError("loader should not run"); },
             imageToShow -> { throw new AssertionError("current image should not be shown again"); },
             argument::set,
+            () -> { throw new AssertionError("batch runner should not run"); },
             message -> { throw new AssertionError(message); }
         );
 
@@ -47,6 +49,7 @@ public class InputWorkflowRunnerTest {
             path -> image,
             ignored -> { },
             argument -> macroRan.set(true),
+            () -> { throw new AssertionError("batch runner should not run"); },
             error::set
         );
 
@@ -58,6 +61,7 @@ public class InputWorkflowRunnerTest {
 
     @Test
     public void batchChoiceUsesDedicatedMacroArgument() {
+        final AtomicBoolean batchRan = new AtomicBoolean(false);
         final AtomicReference<String> argument = new AtomicReference<>();
         final InputWorkflowRunner runner = runner(
             () -> null,
@@ -66,12 +70,14 @@ public class InputWorkflowRunnerTest {
             path -> { throw new AssertionError("loader should not run"); },
             ignored -> { },
             argument::set,
+            () -> batchRan.set(true),
             message -> { throw new AssertionError(message); }
         );
 
         runner.run();
 
-        assertEquals(InputWorkflowRunner.BATCH_ARGUMENT, argument.get());
+        assertTrue(batchRan.get());
+        assertNull(argument.get());
     }
 
     @Test
@@ -91,6 +97,7 @@ public class InputWorkflowRunnerTest {
             },
             presented::set,
             argument::set,
+            () -> { throw new AssertionError("batch runner should not run"); },
             message -> { throw new AssertionError(message); }
         );
 
@@ -112,6 +119,7 @@ public class InputWorkflowRunnerTest {
             path -> { throw new ImageLoadingException("Unsupported image format: bad.gif"); },
             ignored -> { },
             argument::set,
+            () -> { throw new AssertionError("batch runner should not run"); },
             error::set
         );
 
@@ -131,6 +139,7 @@ public class InputWorkflowRunnerTest {
             path -> { throw new AssertionError("loader should not run"); },
             ignored -> { },
             argument -> macroRan.set(true),
+            () -> { throw new AssertionError("batch runner should not run"); },
             message -> { throw new AssertionError(message); }
         );
 
@@ -146,6 +155,7 @@ public class InputWorkflowRunnerTest {
         final java.util.function.Function<Path, ImagePlus> imageLoader,
         final java.util.function.Consumer<ImagePlus> imagePresenter,
         final java.util.function.Consumer<String> macroRunner,
+        final WorkflowRunner batchRunner,
         final java.util.function.Consumer<String> errorReporter
     ) {
         return new InputWorkflowRunner(
@@ -155,6 +165,7 @@ public class InputWorkflowRunnerTest {
             imageLoader,
             imagePresenter,
             macroRunner,
+            batchRunner,
             errorReporter
         );
     }

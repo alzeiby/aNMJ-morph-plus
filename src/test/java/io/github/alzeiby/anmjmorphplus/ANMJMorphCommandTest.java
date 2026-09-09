@@ -33,7 +33,11 @@ public class ANMJMorphCommandTest {
         final String macro = LegacyMacroRunner.loadMacro();
         assertTrue(macro.contains("function processOpenImage(fileName)"));
         assertTrue(macro.contains("javaArgument = getArgument();"));
+        assertTrue(macro.contains("getJavaArgumentValue(\"muscle-channel\")"));
+        assertTrue(macro.contains("getJavaArgumentValue(\"two-plane\")"));
         assertTrue(macro.contains("selectImage(javaImageId);"));
+        assertTrue(macro.contains("2/7 Threshold Nerve terminal."));
+        assertTrue(macro.contains("Screen 6/7 Check segmented image."));
         assertTrue(macro.contains("totalLengthOfBranches = (imageWidth * imageHeight - counts0) * pixelSizeX;"));
         assertTrue(macro.contains("File.append(output, outputFilename);"));
     }

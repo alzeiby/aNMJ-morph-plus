@@ -17,7 +17,6 @@ final class InputWorkflowRunner implements WorkflowRunner {
     static final String TIME_SERIES_ERROR =
         "Time-series images (T > 1) are not supported. Reduce the image to a single time point before running aNMJ-morph+.";
     static final String IMAGE_ARGUMENT_PREFIX = "image-id=";
-    static final String BATCH_ARGUMENT = "batch";
 
     private final Supplier<ImagePlus> currentImage;
     private final Supplier<InputMode> modeSelector;
@@ -25,6 +24,7 @@ final class InputWorkflowRunner implements WorkflowRunner {
     private final Function<Path, ImagePlus> imageLoader;
     private final Consumer<ImagePlus> imagePresenter;
     private final Consumer<String> macroRunner;
+    private final WorkflowRunner batchRunner;
     private final Consumer<String> errorReporter;
 
     InputWorkflowRunner() {
@@ -36,6 +36,7 @@ final class InputWorkflowRunner implements WorkflowRunner {
         this.imageLoader = loader::load;
         this.imagePresenter = ImagePlus::show;
         this.macroRunner = legacy::run;
+        this.batchRunner = new BatchSessionRunner();
         this.errorReporter = message -> IJ.error("aNMJ-morph+", message);
     }
 
@@ -46,6 +47,7 @@ final class InputWorkflowRunner implements WorkflowRunner {
         final Function<Path, ImagePlus> imageLoader,
         final Consumer<ImagePlus> imagePresenter,
         final Consumer<String> macroRunner,
+        final WorkflowRunner batchRunner,
         final Consumer<String> errorReporter
     ) {
         this.currentImage = Objects.requireNonNull(currentImage, "currentImage");
@@ -54,6 +56,7 @@ final class InputWorkflowRunner implements WorkflowRunner {
         this.imageLoader = Objects.requireNonNull(imageLoader, "imageLoader");
         this.imagePresenter = Objects.requireNonNull(imagePresenter, "imagePresenter");
         this.macroRunner = Objects.requireNonNull(macroRunner, "macroRunner");
+        this.batchRunner = Objects.requireNonNull(batchRunner, "batchRunner");
         this.errorReporter = Objects.requireNonNull(errorReporter, "errorReporter");
     }
 
@@ -70,7 +73,7 @@ final class InputWorkflowRunner implements WorkflowRunner {
             return;
         }
         if (mode == InputMode.BATCH_FOLDER) {
-            macroRunner.accept(BATCH_ARGUMENT);
+            batchRunner.run();
             return;
         }
 
