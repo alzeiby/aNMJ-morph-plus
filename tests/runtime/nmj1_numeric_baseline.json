@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "reference": {
+    "path": "Reference Images/NMJ_1.lsm",
+    "sha256": "b60dcedcd7509183e61a5301110f114fdaf366348f8297cae96608d6c902e0c2"
+  },
+  "macro": {
+    "normalized_sha256": "1a36bdcd1114f0c538f969be5dde488648987aaf6f3b8f6a10bd5188e44dc563",
+    "oracle_output_commit": "756cbeb4f7d27026e6e03f35b542e81d4fdba2ee",
+    "current_macro_commit_when_pinned": "4e05a5582f112064f17bb06eeec1b165c788fc64"
+  },
+  "automation": {
+    "muscle_endplate_channel": 1,
+    "nerve_terminal_channel": 2,
+    "threshold_method": "Default/Default",
+    "axon_width_lines_pixels": [10, 12, 8],
+    "stage6_segmentation_accepted": true
+  },
+  "validated_environment": {
+    "platform": "Windows x86_64",
+    "imagej1": "1.54p",
+    "bio_formats": "8.5.0",
+    "fiji_archive": "fiji-win64-20260718.zip",
+    "fiji_archive_sha256": "5267fc8470c4f87cb948848898cc0dc62f74b69a78f3abf2a8643fe3a4af6c4a",
+    "morphology_collection_sha256": "694de653a7e79c52eec3b7a47f75414d93cb317b4f6402d3c8fba05d255e0b7c",
+    "note": "Numerical oracle captured from the automated fresh-Fiji NMJ_1.lsm seven-stage run at 756cbeb. Commit 71440db changes only extension-routing structure relative to that run, and the production macro is unchanged through pinned base 4e05a55. Update intentionally if the pinned runtime stack or scientific behavior changes."
+  },
+  "exact_fields": {
+    "image_dimensions_pixels": {
+      "column": 0,
+      "expected": "512 x 512"
+    },
+    "image_dimensions_metric": {
+      "column": 1,
+      "expected": "67.47557148 x 67.47557148microns"
+    },
+    "input_name": {
+      "column": 2,
+      "expected": "NMJ_1.lsm"
+    },
+    "threshold_method": {
+      "column": 3,
+      "expected": "Default/Default"
+    }
+  },
+  "numeric_fields": {
+    "axon_diameter": {
+      "column": 5,
+      "expected": 1.31788226,
+      "abs_tolerance": 0.000001
+    },
+    "nerve_terminal_perimeter": {
+      "column": 6,
+      "expected": 635.50525379,
+      "abs_tolerance": 0.0001
+    },
+    "nerve_terminal_area": {
+      "column": 7,
+      "expected": 452.57889814,
+      "abs_tolerance": 0.0001
+    },
+    "connectivity_background_pixels": {
+      "column": 8,
+      "expected": 259923,
+      "abs_tolerance": 0
+    },
+    "connectivity_terminal_pixels": {
+      "column": 9,
+      "expected": 99,
+      "abs_tolerance": 0
+    },
+    "connectivity_three_point_pixels": {
+      "column": 10,
+      "expected": 139,
+      "abs_tolerance": 0
+    },
+    "connectivity_four_point_pixels": {
+      "column": 11,
+      "expected": 23,
+      "abs_tolerance": 0
+    },
+    "total_length_of_branches": {
+      "column": 14,
+      "expected": 292.70164895,
+      "abs_tolerance": 0.0001
+    },
+    "achr_perimeter": {
+      "column": 17,
+      "expected": 586.75552449,
+      "abs_tolerance": 0.0001
+    },
+    "achr_area": {
+      "column": 18,
+      "expected": 432.90079961,
+      "abs_tolerance": 0.0001
+    },
+    "endplate_diameter": {
+      "column": 19,
+      "expected": 33.58609418,
+      "abs_tolerance": 0.0001
+    },
+    "endplate_perimeter": {
+      "column": 20,
+      "expected": 107.30171646,
+      "abs_tolerance": 0.0001
+    },
+    "endplate_area": {
+      "column": 21,
+      "expected": 711.72886127,
+      "abs_tolerance": 0.0001
+    },
+    "unoccupied_achr_area": {
+      "column": 23,
+      "expected": 4315.80853971,
+      "abs_tolerance": 0.0001
+    },
+    "number_of_achr_clusters": {
+      "column": 26,
+      "expected": 1,
+      "abs_tolerance": 0
+    }
+  }
+}
