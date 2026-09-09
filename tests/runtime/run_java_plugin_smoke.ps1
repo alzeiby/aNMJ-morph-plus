@@ -51,10 +51,6 @@ try {
                 break
             }
         }
-        $process.Refresh()
-        if ($process.HasExited) {
-            break
-        }
         Start-Sleep -Milliseconds 250
     }
 } finally {
