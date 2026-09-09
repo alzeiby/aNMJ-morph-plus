@@ -3,12 +3,17 @@ package io.github.alzeiby.anmjmorphplus;
 import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;
+import ij.ImageStack;
 import ij.WindowManager;
 import ij.gui.Line;
 import ij.gui.Roi;
+import ij.measure.Calibration;
 import ij.plugin.frame.ThresholdAdjuster;
+import ij.process.ByteProcessor;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -80,6 +85,7 @@ public final class DirectJavaAnalysisRuntime {
 
         final ImageJ imageJ = new ImageJ(ImageJ.NO_SHOW);
         try {
+            verifyChannelSelectionScience();
             final Path rectangularInput = rectangularInputDir.resolve("NMJ_1_rect_384x512.tif");
             createRectangularFixture(reference, rectangularInput);
             final Path anisotropicInput = anisotropicInputDir.resolve("NMJ_1_aniso_y2.lsm");
@@ -114,6 +120,71 @@ public final class DirectJavaAnalysisRuntime {
         }
     }
 
+    private static void verifyChannelSelectionScience() {
+        verifySelectedChannels(3, new BatchChoiceResolver.ChannelChoice(3, 1), 33, 11);
+        verifySelectedChannels(10, new BatchChoiceResolver.ChannelChoice(10, 3), 11, 22);
+    }
+
+    private static void verifySelectedChannels(
+        final int channelCount,
+        final BatchChoiceResolver.ChannelChoice choice,
+        final int expectedMuscle,
+        final int expectedNerve
+    ) {
+        final Set<Integer> existing = imageIds();
+        ImagePlus source = null;
+        try {
+            final ImageStack stack = new ImageStack(2, 2);
+            for (int channel = 1; channel <= channelCount; channel++) {
+                final byte value = (byte) (channel * 11);
+                stack.addSlice(new ByteProcessor(2, 2, new byte[] {value, value, value, value}, null));
+            }
+            source = new ImagePlus("channel-selection-probe", stack);
+            source.setDimensions(channelCount, 1, 1);
+            source.setOpenAsHyperStack(true);
+            final Calibration calibration = source.getCalibration().copy();
+            calibration.pixelWidth = 2.5;
+            calibration.pixelHeight = 7.0;
+            calibration.setUnit("um");
+            source.setCalibration(calibration);
+            final String expectedUnit = source.getCalibration().getUnit();
+
+            final Method splitSelected = AnalysisWorkflow.class.getDeclaredMethod(
+                "splitSelected", ImagePlus.class, BatchChoiceResolver.ChannelChoice.class
+            );
+            splitSelected.setAccessible(true);
+            final Object channels = splitSelected.invoke(null, source, choice);
+            final Field muscleField = channels.getClass().getDeclaredField("muscle");
+            final Field nerveField = channels.getClass().getDeclaredField("nerve");
+            muscleField.setAccessible(true);
+            nerveField.setAccessible(true);
+            final ImagePlus muscle = (ImagePlus) muscleField.get(channels);
+            final ImagePlus nerve = (ImagePlus) nerveField.get(channels);
+
+            require(muscle.getProcessor().get(0, 0) == expectedMuscle,
+                "Muscle channel pixels changed for " + channelCount + "-channel input");
+            require(nerve.getProcessor().get(0, 0) == expectedNerve,
+                "Nerve channel pixels changed for " + channelCount + "-channel input");
+            require(Double.compare(muscle.getCalibration().pixelWidth, 2.5) == 0 &&
+                    Double.compare(muscle.getCalibration().pixelHeight, 7.0) == 0,
+                "Muscle channel calibration changed for " + channelCount + "-channel input");
+            require(Double.compare(nerve.getCalibration().pixelWidth, 2.5) == 0 &&
+                    Double.compare(nerve.getCalibration().pixelHeight, 7.0) == 0,
+                "Nerve channel calibration changed for " + channelCount + "-channel input");
+            require(expectedUnit.equals(muscle.getCalibration().getUnit()) &&
+                    expectedUnit.equals(nerve.getCalibration().getUnit()),
+                "Channel calibration unit changed for " + channelCount + "-channel input");
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Could not run channel-selection scientific probe", e);
+        } finally {
+            if (source != null && source.getWindow() == null) {
+                source.changes = false;
+                source.close();
+            }
+            closeImagesCreatedAfter(existing);
+        }
+    }
+
     private static void analyzeOne(
         final Path input,
         final DeterministicReviewPrompter prompter,
@@ -140,20 +211,6 @@ public final class DirectJavaAnalysisRuntime {
             }
             image.show();
 
-            BatchChoiceResolver.ChannelChoice analysisChoice = CHANNELS;
-            boolean channelsCanonical = false;
-            if (image.getNChannels() <= ChannelRoleCanonicalizer.IMAGEJ_ARRANGER_MAX_CHANNELS) {
-                final ImagePlus canonical = new ChannelRoleCanonicalizer().canonicalize(image, CHANNELS);
-                if (canonical != image) {
-                    image.changes = false;
-                    image.close();
-                    image = canonical;
-                    image.show();
-                }
-                analysisChoice = CHANNELS;
-                channelsCanonical = image.getNChannels() == 2 && image.isComposite();
-            }
-
             if (doubleYPixelSize) {
                 final ij.measure.Calibration calibration = image.getCalibration().copy();
                 calibration.pixelHeight = calibration.pixelWidth * 2.0;
@@ -164,8 +221,7 @@ public final class DirectJavaAnalysisRuntime {
             workflow.analyze(
                 image,
                 input,
-                analysisChoice,
-                channelsCanonical,
+                CHANNELS,
                 result -> new CsvOutputWriter().append(AnalysisOutputPaths.forInput(input).csv, result)
             );
         } finally {

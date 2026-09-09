@@ -2,7 +2,6 @@ package io.github.alzeiby.anmjmorphplus;
 
 import ij.ImagePlus;
 import ij.plugin.ZProjector;
-import ij.process.ColorProcessor;
 import ij.plugin.CompositeConverter;
 
 import java.util.Objects;
@@ -27,7 +26,7 @@ final class StructuralNormalizer {
             case USE_AS_IS:
                 return image;
             case RGB_TO_CHANNELS:
-                return rgbToChannels(image);
+                return CompositeConverter.makeComposite(image);
             case CHOOSE_TWO_PLANE_INTERPRETATION:
                 if (twoPlaneInterpretation == null) {
                     throw new IllegalArgumentException("Two-plane interpretation is required");
@@ -47,17 +46,6 @@ final class StructuralNormalizer {
         }
     }
 
-    private static ImagePlus rgbToChannels(final ImagePlus image) {
-        if (!(image.getProcessor() instanceof ColorProcessor)) {
-            throw new IllegalArgumentException("Expected an ImageJ RGB image");
-        }
-        final ImagePlus composite = CompositeConverter.makeComposite(image);
-        if (composite == null) {
-            throw new IllegalStateException("ImageJ could not convert RGB image to a composite");
-        }
-        return composite;
-    }
-
     private static ImagePlus maxProjectZ(final ImagePlus image) {
         if (image.getNSlices() <= 1) {
             return image;
@@ -67,7 +55,6 @@ final class StructuralNormalizer {
             throw new IllegalStateException("ImageJ could not maximum-project the Z stack");
         }
         projection.setTitle(image.getTitle());
-        projection.setCalibration(image.getCalibration());
         projection.setFileInfo(image.getOriginalFileInfo());
         final Object info = image.getProperty("Info");
         if (info != null) {

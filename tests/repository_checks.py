@@ -19,7 +19,6 @@ def main() -> None:
     pom = text("pom.xml")
     analysis = text("src/main/java/io/github/alzeiby/anmjmorphplus/AnalysisWorkflow.java")
     batch = text("src/main/java/io/github/alzeiby/anmjmorphplus/BatchSessionRunner.java")
-    batch_processor = text("src/main/java/io/github/alzeiby/anmjmorphplus/JavaBatchFileProcessor.java")
     single = text("src/main/java/io/github/alzeiby/anmjmorphplus/InputWorkflowRunner.java")
     csv_writer = text("src/main/java/io/github/alzeiby/anmjmorphplus/CsvOutputWriter.java")
     runtime = text("tests/runtime/run_direct_java_analysis.ps1")
@@ -36,15 +35,12 @@ def main() -> None:
     require("aNMJ-morph macro.txt" not in pom, "Legacy macro is still packaged into the plugin JAR")
 
     # Both interactive entry points must converge on the same direct Java scientific workflow.
-    require("new JavaBatchFileProcessor()" in batch, "Batch mode is not routed to direct Java analysis")
+    require("new SingleImageAnalysisRunner()" in batch, "Batch mode is not routed to direct Java analysis")
     require("new SingleImageAnalysisRunner()" in single, "Single-image mode is not routed to direct Java analysis")
-    require("new SingleImageAnalysisRunner()" in batch_processor,
-            "Batch processor does not use the shared direct Java analysis runner")
     require("new AnalysisWorkflow" in text("src/main/java/io/github/alzeiby/anmjmorphplus/SingleImageAnalysisRunner.java"),
             "Single-image processor does not use AnalysisWorkflow")
-    analysis_call = batch_processor.index("analysisRunner.analyzeCanonical")
-    require(batch_processor.index("analysisRunner.canonicalizeSelected") < batch_processor.rfind("try {", 0, analysis_call),
-            "Batch channel canonicalization must remain outside analysis-failure wrapping")
+    require("BatchCheckpointStore" not in production and "BatchFileException" not in production,
+            "Retired checkpoint/error-state plumbing returned")
 
     # Preserve the scientific method while delegating image operations to ImageJ/Fiji.
     for marker in (

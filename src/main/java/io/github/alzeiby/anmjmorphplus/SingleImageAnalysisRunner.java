@@ -9,7 +9,6 @@ import java.nio.file.Path;
 final class SingleImageAnalysisRunner {
 
     private final StructuralNormalizer structuralNormalizer = new StructuralNormalizer();
-    private final ChannelRoleCanonicalizer channelRoleCanonicalizer = new ChannelRoleCanonicalizer();
     private final AnalysisWorkflow analysisWorkflow = new AnalysisWorkflow();
     private final CsvOutputWriter outputWriter = new CsvOutputWriter();
 
@@ -34,6 +33,26 @@ final class SingleImageAnalysisRunner {
         analyzeSelected(image, inputPath, chooseChannels(image.getNChannels()));
     }
 
+    void analyzeBatch(ImagePlus image, final Path inputPath, final BatchChoiceResolver choices) {
+        final InputNormalization normalization = StructuralNormalizer.normalizationFor(image);
+        if (normalization == InputNormalization.REJECT_TIME_SERIES) {
+            throw new IllegalArgumentException(InputWorkflowRunner.TIME_SERIES_ERROR);
+        }
+        final SupportedImageFormat format = SupportedImageFormat.fromName(inputPath.getFileName().toString())
+            .orElseThrow(() -> new IllegalArgumentException("Unsupported image format: " + inputPath));
+        final TwoPlaneInterpretation twoPlane = normalization == InputNormalization.CHOOSE_TWO_PLANE_INTERPRETATION
+            ? choices.resolveTwoPlane(BatchChoiceResolver.signature(format, image, normalization, null))
+            : null;
+        final String signature = BatchChoiceResolver.signature(
+            format, image, normalization, twoPlane == null ? null : twoPlane.name()
+        );
+        image = normalizeAndPresent(image, twoPlane, true);
+        if (image.getNChannels() < 2) {
+            throw new IllegalArgumentException("At least two channels are required to select muscle endplate and nerve terminal");
+        }
+        analyzeSelected(image, inputPath, choices.resolveChannels(signature, image.getNChannels()));
+    }
+
     ImagePlus normalizeAndPresent(
         ImagePlus image,
         final TwoPlaneInterpretation twoPlane,
@@ -53,43 +72,12 @@ final class SingleImageAnalysisRunner {
     }
 
     void analyzeSelected(
-        ImagePlus image,
-        final Path inputPath,
-        final BatchChoiceResolver.ChannelChoice selected
-    ) {
-        BatchChoiceResolver.ChannelChoice analysisChoice = selected;
-        boolean channelsCanonical = false;
-        if (image.getNChannels() <= ChannelRoleCanonicalizer.IMAGEJ_ARRANGER_MAX_CHANNELS) {
-            image = canonicalizeSelected(image, selected);
-            analysisChoice = new BatchChoiceResolver.ChannelChoice(1, 2);
-            channelsCanonical = image.getNChannels() == 2 && image.isComposite();
-        }
-
-        analyzeCanonical(image, inputPath, analysisChoice, channelsCanonical);
-    }
-
-    ImagePlus canonicalizeSelected(
-        final ImagePlus image,
-        final BatchChoiceResolver.ChannelChoice selected
-    ) {
-        final ImagePlus canonical = channelRoleCanonicalizer.canonicalize(image, selected);
-        if (canonical != image) {
-            canonical.show();
-        }
-        return canonical;
-    }
-
-    void analyzeCanonical(
         final ImagePlus image,
         final Path inputPath,
-        final BatchChoiceResolver.ChannelChoice analysisChoice,
-        final boolean channelsCanonical
+        final BatchChoiceResolver.ChannelChoice selected
     ) {
         analysisWorkflow.analyze(
-            image,
-            inputPath,
-            analysisChoice,
-            channelsCanonical,
+            image, inputPath, selected,
             result -> outputWriter.append(AnalysisOutputPaths.forInput(inputPath).csv, result)
         );
     }

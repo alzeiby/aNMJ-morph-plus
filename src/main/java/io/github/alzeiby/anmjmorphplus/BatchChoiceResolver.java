@@ -4,8 +4,8 @@ import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.GenericDialog;
 
-import java.nio.file.Path;
-import java.util.Objects;
+import java.util.HashMap;
+import java.util.Map;
 
 final class BatchChoiceResolver {
 
@@ -29,149 +29,56 @@ final class BatchChoiceResolver {
         }
     }
 
-    static class Prompter {
-        PromptResult<TwoPlaneInterpretation> promptTwoPlane() {
-            return BatchChoiceResolver.promptTwoPlane(true);
-        }
-
-        PromptResult<ChannelChoice> promptChannels(final int channelCount) {
-            return BatchChoiceResolver.promptChannels(channelCount, true);
-        }
-    }
-
-    private final Path root;
-    private final BatchCheckpointStore store;
-    private final BatchCheckpointStore.Session session;
-    private final Prompter prompter;
-
-    BatchChoiceResolver(
-        final Path root,
-        final BatchCheckpointStore store,
-        final BatchCheckpointStore.Session session,
-        final Prompter prompter
-    ) {
-        this.root = Objects.requireNonNull(root, "root");
-        this.store = Objects.requireNonNull(store, "store");
-        this.session = Objects.requireNonNull(session, "session");
-        this.prompter = Objects.requireNonNull(prompter, "prompter");
-    }
+    private final Map<String, TwoPlaneInterpretation> twoPlaneChoices = new HashMap<>();
+    private final Map<String, ChannelChoice> channelChoices = new HashMap<>();
 
     TwoPlaneInterpretation resolveTwoPlane(final String signature) {
-        final String key = "two-plane|" + signature;
-        final String remembered = session.choices.get(key);
-        if (remembered != null) {
-            try {
-                return TwoPlaneInterpretation.valueOf(remembered);
-            } catch (IllegalArgumentException e) {
-                throw new BatchCheckpointStore.BatchCheckpointException("Malformed remembered two-plane choice", e);
-            }
-        }
-        final PromptResult<TwoPlaneInterpretation> result = prompter.promptTwoPlane();
-        if (result == null || result.value == null) {
-            throw BatchFileException.cancelled("Two-plane interpretation was cancelled");
-        }
-        if (result.remember) {
-            session.choices.put(key, result.value.name());
-            store.save(root, session);
-        }
+        final TwoPlaneInterpretation remembered = twoPlaneChoices.get(signature);
+        if (remembered != null) return remembered;
+        final PromptResult<TwoPlaneInterpretation> result = promptTwoPlane(true);
+        if (result == null) throw new AnalysisCancelledException();
+        if (result.remember) twoPlaneChoices.put(signature, result.value);
         return result.value;
     }
 
     ChannelChoice resolveChannels(final String signature, final int channelCount) {
-        final String key = "channels|" + signature;
-        final String remembered = session.choices.get(key);
-        if (remembered != null) {
-            final String[] values = remembered.split(",", -1);
-            if (values.length != 2) {
-                throw new BatchCheckpointStore.BatchCheckpointException("Malformed remembered channel choice");
-            }
-            try {
-                return validateChannels(
-                    new ChannelChoice(Integer.parseInt(values[0]), Integer.parseInt(values[1])),
-                    channelCount
-                );
-            } catch (NumberFormatException e) {
-                throw new BatchCheckpointStore.BatchCheckpointException("Malformed remembered channel choice", e);
-            }
-        }
-        final PromptResult<ChannelChoice> result = prompter.promptChannels(channelCount);
-        if (result == null || result.value == null) {
-            throw BatchFileException.cancelled("Channel selection was cancelled");
-        }
-        final ChannelChoice choice = validateChannels(result.value, channelCount);
-        if (result.remember) {
-            session.choices.put(
-                key,
-                choice.muscleEndplateChannel + "," + choice.nerveTerminalChannel
-            );
-            store.save(root, session);
-        }
-        return choice;
-    }
-
-    private static ChannelChoice validateChannels(final ChannelChoice choice, final int channelCount) {
-        if (choice.muscleEndplateChannel < 1 || choice.muscleEndplateChannel > channelCount ||
-            choice.nerveTerminalChannel < 1 || choice.nerveTerminalChannel > channelCount ||
-            choice.muscleEndplateChannel == choice.nerveTerminalChannel) {
-            throw BatchFileException.precheck(
-                "INVALID_CHANNEL_SELECTION",
-                "Muscle endplate and nerve terminal must be different valid channels"
-            );
-        }
-        return choice;
+        final ChannelChoice remembered = channelChoices.get(signature);
+        if (remembered != null) return remembered;
+        final PromptResult<ChannelChoice> result = promptChannels(channelCount, true);
+        if (result == null) throw new AnalysisCancelledException();
+        if (result.remember) channelChoices.put(signature, result.value);
+        return result.value;
     }
 
     static PromptResult<TwoPlaneInterpretation> promptTwoPlane(final boolean allowRemember) {
         final GenericDialog dialog = new GenericDialog("Two-plane image detected");
-        dialog.addMessage(
-            "This image contains one channel and two planes. Choose how the two planes should be interpreted."
-        );
-        dialog.addChoice(
-            "Interpret as",
+        dialog.addMessage("This image contains one channel and two planes. Choose how the two planes should be interpreted.");
+        dialog.addChoice("Interpret as",
             new String[] {"Two channels (Keyence/two-page export)", "Z stack (maximum-project)"},
-            "Two channels (Keyence/two-page export)"
-        );
-        if (allowRemember) {
-            dialog.addCheckbox("Apply this choice to remaining matching files in this batch", false);
-        }
+            "Two channels (Keyence/two-page export)");
+        if (allowRemember) dialog.addCheckbox("Apply this choice to remaining matching files in this batch", false);
         dialog.showDialog();
-        if (dialog.wasCanceled()) {
-            return null;
-        }
-        final TwoPlaneInterpretation choice = dialog.getNextChoiceIndex() == 0
-            ? TwoPlaneInterpretation.CHANNELS
-            : TwoPlaneInterpretation.Z_STACK;
-        return new PromptResult<>(choice, allowRemember && dialog.getNextBoolean());
+        if (dialog.wasCanceled()) return null;
+        final TwoPlaneInterpretation value = dialog.getNextChoiceIndex() == 0
+            ? TwoPlaneInterpretation.CHANNELS : TwoPlaneInterpretation.Z_STACK;
+        return new PromptResult<>(value, allowRemember && dialog.getNextBoolean());
     }
 
     static PromptResult<ChannelChoice> promptChannels(final int channelCount, final boolean allowRemember) {
-        if (channelCount < 2) {
-            throw BatchFileException.precheck(
-                "INVALID_CHANNEL_SELECTION",
-                "At least two channels are required to select muscle endplate and nerve terminal"
-            );
-        }
+        if (channelCount < 2) throw new IllegalArgumentException("At least two channels are required");
         final String[] channels = new String[channelCount];
-        for (int i = 0; i < channelCount; i++) {
-            channels[i] = Integer.toString(i + 1);
-        }
+        for (int i = 0; i < channelCount; i++) channels[i] = Integer.toString(i + 1);
         while (true) {
             final GenericDialog dialog = new GenericDialog("aNMJ-morph+ channel assignment");
             dialog.addChoice("Muscle endplate channel", channels, channels[0]);
             dialog.addChoice("Nerve terminal channel", channels, channels[1]);
-            if (allowRemember) {
-                dialog.addCheckbox("Apply these channel choices to remaining matching files in this batch", false);
-            }
+            if (allowRemember) dialog.addCheckbox("Apply these channel choices to remaining matching files in this batch", false);
             dialog.showDialog();
-            if (dialog.wasCanceled()) {
-                return null;
-            }
+            if (dialog.wasCanceled()) return null;
             final int muscle = dialog.getNextChoiceIndex() + 1;
             final int nerve = dialog.getNextChoiceIndex() + 1;
             final boolean remember = allowRemember && dialog.getNextBoolean();
-            if (muscle != nerve) {
-                return new PromptResult<>(new ChannelChoice(muscle, nerve), remember);
-            }
+            if (muscle != nerve) return new PromptResult<>(new ChannelChoice(muscle, nerve), remember);
             IJ.error("aNMJ-morph+", "Muscle endplate and nerve terminal must use different channels.");
         }
     }
@@ -182,14 +89,8 @@ final class BatchChoiceResolver {
         final InputNormalization normalization,
         final String interpretation
     ) {
-        final String suffix = interpretation == null ? "" : "|interpretation=" + interpretation;
-        return "format=" + format.name() +
-            "|w=" + image.getWidth() +
-            "|h=" + image.getHeight() +
-            "|c=" + image.getNChannels() +
-            "|z=" + image.getNSlices() +
-            "|t=" + image.getNFrames() +
-            "|bit=" + image.getBitDepth() +
-            "|normalization=" + normalization.name() + suffix;
+        return format + "|" + image.getWidth() + "x" + image.getHeight() + "|c" + image.getNChannels() +
+            "|z" + image.getNSlices() + "|t" + image.getNFrames() + "|" + image.getBitDepth() + "|" +
+            normalization + (interpretation == null ? "" : "|" + interpretation);
     }
 }

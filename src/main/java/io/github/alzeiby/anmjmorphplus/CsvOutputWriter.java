@@ -62,7 +62,7 @@ final class CsvOutputWriter {
             if (contents.length > 0 && contents[contents.length - 1] != '\n') {
                 write(csv, "\n", StandardOpenOption.APPEND);
             }
-            return (int) BatchSessionRunner.countCsvLines(csv) + 1;
+            return Files.readAllLines(csv).size() + 1;
         } catch (IOException e) {
             throw new IllegalStateException("Could not prepare CSV output: " + csv, e);
         }
