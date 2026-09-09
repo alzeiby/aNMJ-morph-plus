@@ -27,9 +27,13 @@ if (-not (Test-Path -LiteralPath $fijiLauncher)) {
 
 $reference = Join-Path $repoRoot 'Reference Images\NMJ_1.lsm'
 $builder = Join-Path $runtimeDir 'build_harnesses.py'
+$fixtureBuilder = Join-Path $runtimeDir 'build_fixture_probes.py'
+$fixtureValidator = Join-Path $runtimeDir 'validate_fixture_probe.py'
 $validator = Join-Path $runtimeDir 'validate_outputs.py'
 & python $builder --macro $MacroPath --reference $reference --work-dir $workDir
 if ($LASTEXITCODE -ne 0) { throw 'Harness generation failed' }
+& python $fixtureBuilder --macro $MacroPath --work-dir (Join-Path $workDir 'fixtures')
+if ($LASTEXITCODE -ne 0) { throw 'Fixture-probe generation failed' }
 
 function Assert-NoFijiProcess {
     $existing = Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq $fiji }
@@ -45,7 +49,7 @@ function Stop-ValidationFijiProcesses {
     }
 }
 
-function Run-Harness([string]$Harness, [string]$Trace, [string]$Label) {
+function Run-Harness([string]$Harness, [string]$Trace, [string]$Label, [string]$CompletionMarker) {
     Assert-NoFijiProcess
     if (Test-Path -LiteralPath $Trace) { Remove-Item -LiteralPath $Trace -Force }
 
@@ -57,7 +61,7 @@ function Run-Harness([string]$Harness, [string]$Trace, [string]$Label) {
     while ((Get-Date) -lt $deadline) {
         if (Test-Path -LiteralPath $Trace) {
             $traceText = Get-Content -LiteralPath $Trace -Raw
-            if ($traceText -like '*DONE stage 7*') {
+            if ($traceText -like "*$CompletionMarker*") {
                 $complete = $true
                 break
             }
@@ -81,23 +85,29 @@ function Run-Harness([string]$Harness, [string]$Trace, [string]$Label) {
     }
     if (-not $complete) {
         $tail = if (Test-Path -LiteralPath $Trace) { (Get-Content -LiteralPath $Trace -Tail 8) -join "`n" } else { '<no trace>' }
-        throw "$Label did not reach stage 7 within $TimeoutSeconds seconds.`n$tail"
+        throw "$Label did not reach completion marker '$CompletionMarker' within $TimeoutSeconds seconds.`n$tail"
     }
 }
 
+$fixtureHarness = Join-Path $workDir 'fixtures\fixture_probe.ijm'
+$fixtureTrace = Join-Path $workDir 'fixtures\fixture_probe.txt'
 $squareHarness = Join-Path $workDir 'square\aNMJ-morph-plus-e2e.ijm'
 $squareTrace = Join-Path $workDir 'square\trace.txt'
 $rectHarness = Join-Path $workDir 'rectangular\aNMJ-morph-plus-rect-e2e.ijm'
 $rectTrace = Join-Path $workDir 'rectangular\trace.txt'
 
+Run-Harness $fixtureHarness $fixtureTrace "fixture metadata probe" "DONE fixtures"
+& python $fixtureValidator --trace $fixtureTrace
+if ($LASTEXITCODE -ne 0) { throw 'Runtime fixture metadata validation failed' }
+
 for ($i = 1; $i -le $Runs; $i++) {
-    Run-Harness $squareHarness $squareTrace "square run $i"
+    Run-Harness $squareHarness $squareTrace "square run $i" "DONE stage 7"
 }
 for ($i = 1; $i -le $Runs; $i++) {
-    Run-Harness $rectHarness $rectTrace "rectangular run $i"
+    Run-Harness $rectHarness $rectTrace "rectangular run $i" "DONE stage 7"
 }
 
 & python $validator --work-dir $workDir --runs $Runs
 if ($LASTEXITCODE -ne 0) { throw 'Runtime output validation failed' }
 
-Write-Output "aNMJ-morph+ fresh-Fiji runtime validation passed ($Runs square + $Runs rectangular runs)."
+Write-Output "aNMJ-morph+ fresh-Fiji runtime validation passed (fixture matrix + $Runs square + $Runs rectangular runs)."

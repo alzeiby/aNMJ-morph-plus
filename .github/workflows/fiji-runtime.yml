@@ -81,7 +81,7 @@ jobs:
 
           "FIJI_ROOT=$fijiRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Run two square and two rectangular workflows
+      - name: Run fixture matrix and regression workflows
         shell: powershell
         run: |
           .\tests\runtime\run_validation.ps1 -FijiRoot $env:FIJI_ROOT -Runs 2 -TimeoutSeconds 180
