@@ -7,7 +7,7 @@
   "macro": {
     "normalized_sha256": "1a47a125cb6c5e358cdf8942d5136f501a64ec2dd4476e74528fe59a2db7935e",
     "oracle_output_commit": "756cbeb4f7d27026e6e03f35b542e81d4fdba2ee",
-    "current_macro_commit_when_pinned": "874f70e07db7490219b9908bac9cfe99e1a35769"
+    "current_macro_commit_when_pinned": "5c7dda44bb91ab29898b658184ed447f328cba50"
   },
   "automation": {
     "muscle_endplate_channel": 1,
