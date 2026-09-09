@@ -32,6 +32,8 @@ public class ANMJMorphCommandTest {
     public void canonicalMacroIsPackagedAsMigrationReference() {
         final String macro = LegacyMacroRunner.loadMacro();
         assertTrue(macro.contains("function processOpenImage(fileName)"));
+        assertTrue(macro.contains("javaArgument = getArgument();"));
+        assertTrue(macro.contains("selectImage(javaImageId);"));
         assertTrue(macro.contains("totalLengthOfBranches = (imageWidth * imageHeight - counts0) * pixelSizeX;"));
         assertTrue(macro.contains("File.append(output, outputFilename);"));
     }

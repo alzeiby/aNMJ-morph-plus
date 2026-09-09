@@ -84,6 +84,7 @@
     <package-name>io.github.alzeiby.anmjmorphplus</package-name>
     <license.licenseName>cc-by-4.0</license.licenseName>
     <license.copyrightOwners>Abdullah Alzeiby and the original aNMJ-morph authors</license.copyrightOwners>
+    <bio-formats.version>8.5.0</bio-formats.version>
   </properties>
 
   <repositories>
@@ -101,6 +102,11 @@
     <dependency>
       <groupId>net.imagej</groupId>
       <artifactId>ij</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>ome</groupId>
+      <artifactId>bio-formats_plugins</artifactId>
+      <version>${bio-formats.version}</version>
     </dependency>
     <dependency>
       <groupId>junit</groupId>

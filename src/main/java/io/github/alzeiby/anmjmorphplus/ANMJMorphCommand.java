@@ -9,7 +9,7 @@ public class ANMJMorphCommand implements Command {
     private final WorkflowRunner workflowRunner;
 
     public ANMJMorphCommand() {
-        this(new LegacyMacroRunner());
+        this(new InputWorkflowRunner());
     }
 
     ANMJMorphCommand(final WorkflowRunner workflowRunner) {

@@ -15,6 +15,10 @@ final class LegacyMacroRunner implements WorkflowRunner {
         IJ.runMacro(loadMacro());
     }
 
+    void run(final String argument) {
+        IJ.runMacro(loadMacro(), argument == null ? "" : argument);
+    }
+
     static String loadMacro() {
         try (InputStream stream = LegacyMacroRunner.class.getResourceAsStream(MACRO_RESOURCE)) {
             if (stream == null) {
