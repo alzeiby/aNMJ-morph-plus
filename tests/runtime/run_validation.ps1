@@ -66,8 +66,6 @@ function Run-Harness([string]$Harness, [string]$Trace, [string]$Label, [string]$
                 break
             }
         }
-        $process.Refresh()
-        if ($process.HasExited) { break }
         Start-Sleep -Milliseconds 250
     }
 
