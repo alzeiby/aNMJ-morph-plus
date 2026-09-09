@@ -32,6 +32,8 @@ Developers can also install a build directly with `mvn -Dscijava.app.directory=/
 
 The root `aNMJ-morph macro.txt` remains the canonical reference implementation during the Java migration.
 
+The Java layer now owns single-image selection, supported-format routing, loading, and structural preflight. TIFF inputs use ImageJ directly; the other supported formats use the pinned Bio-Formats API. Java passes the exact loaded/open image ID into the canonical macro, avoiding window-order assumptions. Batch traversal and all scientific transformations and measurements remain in the macro during this migration.
+
 The macro expects Fiji's standard `StartupMacros.fiji.ijm` file in the Fiji macros directory.
 
 ## Usage

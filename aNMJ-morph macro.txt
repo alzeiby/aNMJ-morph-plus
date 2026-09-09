@@ -89,6 +89,15 @@ function normalizeChannels() {
   }
 }
 
+javaArgument = getArgument();
+if (startsWith(javaArgument, "image-id=")) {
+  javaImageId = parseInt(substring(javaArgument, lengthOf("image-id=")));
+  selectImage(javaImageId);
+  processOpenImage(getTitle());
+} else if (javaArgument == "batch") {
+  directory = getDirectory("Select directory with images to process");
+  batchProcess(directory);
+} else {
 list = getList("image.titles");
 if (list.length == 0) {
   Dialog.create("aNMJ-morph+");
@@ -107,6 +116,7 @@ if (list.length == 0) {
 } else {
   safeSelectWindow(list[0]);
   processOpenImage(list[0]);
+}
 }
 
 function processOpenImage(fileName) {
