@@ -67,10 +67,13 @@ public final class DirectJavaAnalysisRuntime {
         Files.createDirectories(work);
         final Path squareDir = work.resolve("square");
         final Path rectangularDir = work.resolve("rectangular");
+        final Path anisotropicDir = work.resolve("anisotropic");
         final Path squareInputDir = squareDir.resolve("input");
         final Path rectangularInputDir = rectangularDir.resolve("input");
+        final Path anisotropicInputDir = anisotropicDir.resolve("input");
         Files.createDirectories(squareInputDir);
         Files.createDirectories(rectangularInputDir);
+        Files.createDirectories(anisotropicInputDir);
 
         final Path squareInput = squareInputDir.resolve("NMJ_1.lsm");
         Files.copy(reference, squareInput, StandardCopyOption.REPLACE_EXISTING);
@@ -79,12 +82,14 @@ public final class DirectJavaAnalysisRuntime {
         try {
             final Path rectangularInput = rectangularInputDir.resolve("NMJ_1_rect_384x512.tif");
             createRectangularFixture(reference, rectangularInput);
+            final Path anisotropicInput = anisotropicInputDir.resolve("NMJ_1_aniso_y2.lsm");
+            Files.copy(reference, anisotropicInput, StandardCopyOption.REPLACE_EXISTING);
 
             final DeterministicReviewPrompter squarePrompter =
                 new DeterministicReviewPrompter(squareDir.resolve("trace.txt"));
             for (int run = 1; run <= runs; run++) {
                 append(squareDir.resolve("trace.txt"), "START direct square run " + run);
-                analyzeOne(squareInput, squarePrompter);
+                analyzeOne(squareInput, squarePrompter, false);
                 append(squareDir.resolve("trace.txt"), "DONE stage 7 direct square run " + run);
             }
 
@@ -92,8 +97,16 @@ public final class DirectJavaAnalysisRuntime {
                 new DeterministicReviewPrompter(rectangularDir.resolve("trace.txt"));
             for (int run = 1; run <= runs; run++) {
                 append(rectangularDir.resolve("trace.txt"), "START direct rectangular run " + run);
-                analyzeOne(rectangularInput, rectangularPrompter);
+                analyzeOne(rectangularInput, rectangularPrompter, false);
                 append(rectangularDir.resolve("trace.txt"), "DONE stage 7 direct rectangular run " + run);
+            }
+
+            final DeterministicReviewPrompter anisotropicPrompter =
+                new DeterministicReviewPrompter(anisotropicDir.resolve("trace.txt"));
+            for (int run = 1; run <= runs; run++) {
+                append(anisotropicDir.resolve("trace.txt"), "START direct anisotropic run " + run);
+                analyzeOne(anisotropicInput, anisotropicPrompter, true);
+                append(anisotropicDir.resolve("trace.txt"), "DONE stage 7 direct anisotropic run " + run);
             }
         } finally {
             closeAllImages();
@@ -103,7 +116,8 @@ public final class DirectJavaAnalysisRuntime {
 
     private static void analyzeOne(
         final Path input,
-        final DeterministicReviewPrompter prompter
+        final DeterministicReviewPrompter prompter,
+        final boolean doubleYPixelSize
     ) {
         final Set<Integer> existing = imageIds();
         try {
@@ -139,6 +153,12 @@ public final class DirectJavaAnalysisRuntime {
                 }
                 analysisChoice = CHANNELS;
                 channelsCanonical = image.getNChannels() == 2 && image.isComposite();
+            }
+
+            if (doubleYPixelSize) {
+                final ij.measure.Calibration calibration = image.getCalibration().copy();
+                calibration.pixelHeight = calibration.pixelWidth * 2.0;
+                image.setCalibration(calibration);
             }
 
             final AnalysisWorkflow workflow = new AnalysisWorkflow(prompter);

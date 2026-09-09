@@ -111,13 +111,14 @@ final class AnalysisWorkflow {
         IJ.run(original.nerve, "Make Binary", "thresholded remaining black");
         IJ.run(original.nerve, "Convert to Mask", "");
         IJ.run(original.nerve, "Skeletonize", "");
+        final double branchPixelSize = AnisotropicSkeletonCalibration.effectivePixelSize(original.nerve);
         IJ.run(original.nerve, "BinaryConnectivity ", "white");
         final int[] histogram = original.nerve.getProcessor().getHistogram();
         final double counts0 = histogram[0];
         final double counts2 = histogram[2];
         final double counts4 = histogram[4];
         final double counts5 = histogram[5];
-        final double totalLengthOfBranches = ((double) width * height - counts0) * pixelSizeX;
+        final double totalLengthOfBranches = ((double) width * height - counts0) * branchPixelSize;
         closeImage(original.nerve);
 
         IJ.run(original.muscle, "Create Selection", "");

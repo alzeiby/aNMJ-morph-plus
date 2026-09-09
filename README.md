@@ -81,15 +81,15 @@ The repository also retains the original tutorial video, 20 reference NMJ images
 
 ### Rectangular-image compatibility
 
-The original macro used one side length for frame-size calculations. aNMJ-morph+ tracks width and height independently and calculates total branch length as:
+The original macro used one side length for frame-size calculations. aNMJ-morph+ tracks width and height independently and retains the original skeleton-pixel-count branch-length estimator:
 
 ```text
-(width × height - background skeleton pixels) × calibrated pixel size
+(width × height - background skeleton pixels) × calibrated skeleton-pixel scale
 ```
 
-For square images this is mathematically equivalent to the original formula. The first two CSV metadata columns now contain `width x height` values rather than a single scalar side length, so downstream scripts that parse those columns may need to be updated.
+For isotropic pixels, the calibrated skeleton-pixel scale is exactly `pixelWidth`, so published/reference isotropic values remain mathematically identical to the original formula. For anisotropic X/Y pixels, aNMJ-morph+ treats each disconnected 8-connected skeleton component independently, counts its horizontal, vertical, and non-redundant diagonal neighbor steps, and weights those orientations by `pixelWidth`, `pixelHeight`, and `hypot(pixelWidth, pixelHeight)` respectively. Each component's physical-to-unit-grid stretch ratio is applied to that component's unchanged legacy foreground-pixel count, and the component contributions are summed. An isolated skeleton pixel has no orientation, so it uses the symmetric geometric-mean X/Y scale. This corrects the former X-only scaling without replacing the underlying aNMJ-morph branch-length definition or allowing one disconnected branch to change another branch's calibration.
 
-The branch-length calculation still assumes isotropic X/Y pixel calibration. The plugin warns when X and Y pixel sizes differ. Anisotropic X/Y handling is intentionally treated as a separate scientific-method change rather than part of the macro-retirement parity migration.
+ImageJ's line length, area, perimeter, and Feret measurements already use X/Y calibration directly and are not rescaled by this correction. The plugin still warns on unequal X/Y sampling because pixel-domain operations such as threshold cleanup, skeletonization, connectivity, and rolling-background processing remain dependent on acquisition sampling density even when reported geometric measurements are calibrated. The first two CSV metadata columns contain `width x height` values rather than a single scalar side length, so downstream scripts that parse those columns may need to be updated.
 
 ## Validation and scientific use
 
