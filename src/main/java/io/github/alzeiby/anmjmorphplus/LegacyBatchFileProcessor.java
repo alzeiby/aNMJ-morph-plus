@@ -16,6 +16,7 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
     private final Consumer<ImagePlus> imagePresenter;
     private final Function<String, String> macroRunner;
     private final StructuralNormalizer structuralNormalizer;
+    private final ChannelRoleCanonicalizer channelRoleCanonicalizer;
 
     LegacyBatchFileProcessor() {
         final ImageLoader loader = new ImageLoader();
@@ -24,6 +25,7 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
         this.imagePresenter = ImagePlus::show;
         this.macroRunner = macro::runForResult;
         this.structuralNormalizer = new StructuralNormalizer();
+        this.channelRoleCanonicalizer = new ChannelRoleCanonicalizer();
     }
 
     LegacyBatchFileProcessor(
@@ -36,6 +38,7 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
         this.imagePresenter = Objects.requireNonNull(imagePresenter, "imagePresenter");
         this.macroRunner = Objects.requireNonNull(macroRunner, "macroRunner");
         this.structuralNormalizer = Objects.requireNonNull(structuralNormalizer, "structuralNormalizer");
+        this.channelRoleCanonicalizer = new ChannelRoleCanonicalizer();
     }
 
     @Override
@@ -95,7 +98,17 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
             final BatchChoiceResolver.ChannelChoice channelChoice =
                 choices.resolveChannels(channelSignature, effectiveChannels);
 
-            final String argument = buildMacroArgument(image, channelChoice);
+            BatchChoiceResolver.ChannelChoice macroChannelChoice = channelChoice;
+            if (effectiveChannels <= ChannelRoleCanonicalizer.IMAGEJ_ARRANGER_MAX_CHANNELS) {
+                final ImagePlus canonical = channelRoleCanonicalizer.canonicalize(image, channelChoice);
+                if (canonical != image) {
+                    image = canonical;
+                    imagePresenter.accept(image);
+                }
+                macroChannelChoice = new BatchChoiceResolver.ChannelChoice(1, 2);
+            }
+
+            final String argument = buildMacroArgument(image, macroChannelChoice);
             final String result;
             try {
                 result = macroRunner.apply(argument);

@@ -1,21 +1,27 @@
 import ij.CompositeImage;
 import ij.ImagePlus;
 import ij.ImageStack;
+import ij.WindowManager;
 import ij.io.FileInfo;
+import ij.macro.Interpreter;
 import ij.plugin.ZProjector;
 import ij.process.ByteProcessor;
 import ij.process.ColorProcessor;
 import ij.process.FloatProcessor;
+import ij.process.LUT;
 import org.scijava.Context;
 import org.scijava.command.CommandInfo;
 import org.scijava.command.CommandService;
 import org.scijava.plugin.PluginService;
 
+import java.awt.Color;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -30,6 +36,8 @@ public final class JavaPluginSmoke {
         "io.github.alzeiby.anmjmorphplus.StructuralNormalizer";
     private static final String TWO_PLANE_CLASS =
         "io.github.alzeiby.anmjmorphplus.TwoPlaneInterpretation";
+    private static final String CHANNEL_CANONICALIZER_CLASS =
+        "io.github.alzeiby.anmjmorphplus.ChannelRoleCanonicalizer";
 
     private JavaPluginSmoke() {
     }
@@ -57,6 +65,7 @@ public final class JavaPluginSmoke {
 
             command.loadClass();
             smokeStructuralNormalizer();
+            smokeChannelRoleCanonicalizer();
             smokeBatchProjectionBridge();
             System.out.println("DONE java plugin smoke");
         }
@@ -180,6 +189,162 @@ public final class JavaPluginSmoke {
         );
     }
 
+    private static void smokeChannelRoleCanonicalizer() throws Exception {
+        final Class<?> canonicalizerClass = Class.forName(CHANNEL_CANONICALIZER_CLASS);
+        final Constructor<?> canonicalizerConstructor = canonicalizerClass.getDeclaredConstructor();
+        canonicalizerConstructor.setAccessible(true);
+        final Object canonicalizer = canonicalizerConstructor.newInstance();
+        final Class<?> channelChoiceClass = Class.forName(
+            "io.github.alzeiby.anmjmorphplus.BatchChoiceResolver$ChannelChoice"
+        );
+        final Constructor<?> channelChoiceConstructor =
+            channelChoiceClass.getDeclaredConstructor(int.class, int.class);
+        channelChoiceConstructor.setAccessible(true);
+        final Method canonicalize = canonicalizerClass.getDeclaredMethod(
+            "canonicalize",
+            ImagePlus.class,
+            channelChoiceClass
+        );
+        canonicalize.setAccessible(true);
+        final Object threeOne = channelChoiceConstructor.newInstance(3, 1);
+        final Object twoOne = channelChoiceConstructor.newInstance(2, 1);
+
+        final ImageStack stack = new ImageStack(1, 1);
+        addByteSlice(stack, 11);
+        addByteSlice(stack, 22);
+        addByteSlice(stack, 33);
+        final AtomicBoolean sourceClosed = new AtomicBoolean(false);
+        final ImagePlus source = new ImagePlus("roles.lsm", stack) {
+            @Override
+            public void close() {
+                sourceClosed.set(true);
+                super.close();
+            }
+        };
+        source.setDimensions(3, 1, 1);
+        source.setOpenAsHyperStack(true);
+        source.getCalibration().pixelWidth = 0.25;
+        source.getCalibration().pixelHeight = 0.5;
+        final FileInfo fileInfo = new FileInfo();
+        fileInfo.fileName = "roles.lsm";
+        fileInfo.directory = "C:\\role source\\";
+        source.setFileInfo(fileInfo);
+        source.setProperty("Info", "role provenance");
+        final int sourceId = source.getID();
+
+        final ImagePlus canonical = (ImagePlus) canonicalize.invoke(canonicalizer, source, threeOne);
+
+        require(sourceClosed.get(), "Channel canonicalization did not close transformed source");
+        require(canonical != source, "Channel canonicalization did not replace transformed source");
+        require(canonical.getID() != sourceId, "Channel canonicalization reused the source image ID");
+        require(canonical.getNChannels() == 2, "Channel canonicalization did not reduce to two channels");
+        require(canonical.getStack().getProcessor(1).get(0, 0) == 33, "Canonical muscle channel is wrong");
+        require(canonical.getStack().getProcessor(2).get(0, 0) == 11, "Canonical nerve channel is wrong");
+        require("roles.lsm".equals(canonical.getTitle()), "Canonical source title was not preserved");
+        require(canonical.getCalibration().pixelWidth == 0.25, "Canonical pixel width was not preserved");
+        require(canonical.getCalibration().pixelHeight == 0.5, "Canonical pixel height was not preserved");
+        require(canonical.getOriginalFileInfo() != null, "Canonical source FileInfo missing");
+        require(
+            "C:\\role source\\".equals(canonical.getOriginalFileInfo().directory),
+            "Canonical source directory was not preserved"
+        );
+        require(
+            "role provenance".equals(canonical.getProperty("Info")),
+            "Canonical source provenance was not preserved"
+        );
+
+        final ImageStack swapStack = new ImageStack(1, 1);
+        addByteSlice(swapStack, 7);
+        addByteSlice(swapStack, 19);
+        final ImagePlus swap = new ImagePlus("swap.tif", swapStack);
+        swap.setDimensions(2, 1, 1);
+        swap.setOpenAsHyperStack(true);
+        final ImagePlus swapped = (ImagePlus) canonicalize.invoke(canonicalizer, swap, twoOne);
+        require(swapped.getStack().getProcessor(1).get(0, 0) == 19, "Two-channel swap C1 wrong");
+        require(swapped.getStack().getProcessor(2).get(0, 0) == 7, "Two-channel swap C2 wrong");
+
+        final ImageStack compositeStack = new ImageStack(1, 1);
+        addByteSlice(compositeStack, 1);
+        addByteSlice(compositeStack, 2);
+        addByteSlice(compositeStack, 3);
+        final ImagePlus compositeBase = new ImagePlus("composite.tif", compositeStack);
+        compositeBase.setDimensions(3, 1, 1);
+        compositeBase.setOpenAsHyperStack(true);
+        final CompositeImage composite = new CompositeImage(compositeBase, CompositeImage.COMPOSITE);
+        composite.setChannelLut(LUT.createLutFromColor(Color.RED), 1);
+        composite.setChannelLut(LUT.createLutFromColor(Color.GREEN), 2);
+        composite.setChannelLut(LUT.createLutFromColor(Color.BLUE), 3);
+        final ImagePlus arrangedComposite =
+            (ImagePlus) canonicalize.invoke(canonicalizer, composite, threeOne);
+        require(arrangedComposite instanceof CompositeImage, "Canonical composite type was not preserved");
+        final CompositeImage canonicalComposite = (CompositeImage) arrangedComposite;
+        require(canonicalComposite.getMode() == CompositeImage.COMPOSITE, "Canonical composite mode changed");
+        require(canonicalComposite.getChannelLut(1).getBlue(255) == 255, "Selected C3 LUT was not moved to C1");
+        require(canonicalComposite.getChannelLut(2).getRed(255) == 255, "Selected C1 LUT was not moved to C2");
+
+        final float payloadNaN = Float.intBitsToFloat(0x7fc12345);
+        final ImageStack floatStack = new ImageStack(2, 1);
+        floatStack.addSlice(new FloatProcessor(2, 1, new float[] {Float.NEGATIVE_INFINITY, -0.0f}));
+        floatStack.addSlice(new FloatProcessor(2, 1, new float[] {2.0f, 3.0f}));
+        floatStack.addSlice(new FloatProcessor(2, 1, new float[] {payloadNaN, Float.POSITIVE_INFINITY}));
+        final ImagePlus floats = new ImagePlus("float.tif", floatStack);
+        floats.setDimensions(3, 1, 1);
+        floats.setOpenAsHyperStack(true);
+        final ImagePlus canonicalFloats = (ImagePlus) canonicalize.invoke(canonicalizer, floats, threeOne);
+        require(
+            Float.floatToRawIntBits(canonicalFloats.getStack().getProcessor(1).getf(0)) ==
+                Float.floatToRawIntBits(payloadNaN),
+            "Canonical NaN payload bits changed"
+        );
+        require(
+            Float.floatToRawIntBits(canonicalFloats.getStack().getProcessor(1).getf(1)) ==
+                Float.floatToRawIntBits(Float.POSITIVE_INFINITY),
+            "Canonical positive infinity changed"
+        );
+        require(
+            Float.floatToRawIntBits(canonicalFloats.getStack().getProcessor(2).getf(0)) ==
+                Float.floatToRawIntBits(Float.NEGATIVE_INFINITY),
+            "Canonical negative infinity changed"
+        );
+        require(
+            Float.floatToRawIntBits(canonicalFloats.getStack().getProcessor(2).getf(1)) ==
+                Float.floatToRawIntBits(-0.0f),
+            "Canonical signed zero changed"
+        );
+
+        final ImageStack tenStack = new ImageStack(1, 1);
+        for (int channel = 1; channel <= 10; channel++) {
+            addByteSlice(tenStack, channel);
+        }
+        final ImagePlus ten = new ImagePlus("ten.tif", tenStack);
+        ten.setDimensions(10, 1, 1);
+        ten.setOpenAsHyperStack(true);
+        final ImagePlus unchangedTen = (ImagePlus) canonicalize.invoke(canonicalizer, ten, threeOne);
+        require(unchangedTen == ten, ">9-channel image was unexpectedly canonicalized");
+
+        final Class<?> normalizerClass = Class.forName(NORMALIZER_CLASS);
+        final Constructor<?> normalizerConstructor = normalizerClass.getDeclaredConstructor();
+        normalizerConstructor.setAccessible(true);
+        final Object normalizer = normalizerConstructor.newInstance();
+        final Class<?> interpretationClass = Class.forName(TWO_PLANE_CLASS);
+        final Method normalize = normalizerClass.getDeclaredMethod(
+            "normalize",
+            ImagePlus.class,
+            interpretationClass
+        );
+        normalize.setAccessible(true);
+        final ImagePlus twoPlaneChannels = twoPlane(13, 29);
+        final Object channelsChoice = enumConstant(interpretationClass, "CHANNELS");
+        final ImagePlus interpreted =
+            (ImagePlus) normalize.invoke(normalizer, twoPlaneChannels, channelsChoice);
+        final ImagePlus swappedTwoPlane =
+            (ImagePlus) canonicalize.invoke(canonicalizer, interpreted, twoOne);
+        require(swappedTwoPlane.getNChannels() == 2, "Two-plane CHANNELS canonicalization dimensions wrong");
+        require(swappedTwoPlane.getNSlices() == 1, "Two-plane CHANNELS canonicalization retained Z planes");
+        require(swappedTwoPlane.getStack().getProcessor(1).get(0, 0) == 29, "Two-plane CHANNELS swap C1 wrong");
+        require(swappedTwoPlane.getStack().getProcessor(2).get(0, 0) == 13, "Two-plane CHANNELS swap C2 wrong");
+    }
+
     private static void smokeBatchProjectionBridge() throws Exception {
         final Class<?> normalizerClass = Class.forName(NORMALIZER_CLASS);
         final Constructor<?> normalizerConstructor = normalizerClass.getDeclaredConstructor();
@@ -223,8 +388,8 @@ public final class JavaPluginSmoke {
             new Class<?>[] {prompterClass},
             (proxy, method, args) -> {
                 if ("promptChannels".equals(method.getName())) {
-                    final Object channelChoice = channelChoiceConstructor.newInstance(1, 2);
-                    return promptResultConstructor.newInstance(channelChoice, false);
+                    final Object channelChoice = channelChoiceConstructor.newInstance(3, 1);
+                    return promptResultConstructor.newInstance(channelChoice, true);
                 }
                 if ("promptTwoPlane".equals(method.getName())) {
                     throw new IllegalStateException("Unexpected two-plane prompt in Z bridge smoke");
@@ -259,10 +424,13 @@ public final class JavaPluginSmoke {
         final ImageStack stack = new ImageStack(1, 1);
         addByteSlice(stack, 3);
         addByteSlice(stack, 20);
+        addByteSlice(stack, 100);
         addByteSlice(stack, 9);
         addByteSlice(stack, 7);
+        addByteSlice(stack, 80);
         addByteSlice(stack, 4);
         addByteSlice(stack, 12);
+        addByteSlice(stack, 120);
         final AtomicBoolean sourceClosed = new AtomicBoolean(false);
         final ImagePlus source = new ImagePlus("bridge-z.lsm", stack) {
             @Override
@@ -271,19 +439,39 @@ public final class JavaPluginSmoke {
                 super.close();
             }
         };
-        source.setDimensions(2, 3, 1);
+        source.setDimensions(3, 3, 1);
         source.setOpenAsHyperStack(true);
         final FileInfo sourceFileInfo = new FileInfo();
         sourceFileInfo.fileName = "bridge-z.lsm";
         sourceFileInfo.directory = "C:\\source data\\";
         source.setFileInfo(sourceFileInfo);
 
+        final AtomicBoolean sentinelClosed = new AtomicBoolean(false);
+        final ImagePlus sentinel = new ImagePlus("sentinel", new ByteProcessor(1, 1)) {
+            @Override
+            public void close() {
+                sentinelClosed.set(true);
+                super.close();
+            }
+        };
+        Interpreter.addBatchModeImage(sentinel);
+
+        final List<ImagePlus> presentedImages = new ArrayList<>();
         final AtomicReference<ImagePlus> presented = new AtomicReference<>();
         final AtomicReference<String> macroArgument = new AtomicReference<>();
         final Function<Path, ImagePlus> loader = ignored -> source;
-        final Consumer<ImagePlus> presenter = presented::set;
+        final Consumer<ImagePlus> presenter = image -> {
+            presented.set(image);
+            presentedImages.add(image);
+            Interpreter.addBatchModeImage(image);
+        };
         final Function<String, String> macroRunner = argument -> {
             macroArgument.set(argument);
+            final ImagePlus current = presented.get();
+            require(
+                current != null && WindowManager.getImage(current.getID()) == current,
+                "Batch macro image ID does not resolve to the canonical image"
+            );
             return null;
         };
 
@@ -305,23 +493,42 @@ public final class JavaPluginSmoke {
         );
         final Method process = processorClass.getDeclaredMethod("process", Path.class, resolverClass);
         process.setAccessible(true);
-        process.invoke(processor, Path.of("bridge-z.lsm"), resolver);
+        try {
+            process.invoke(processor, Path.of("bridge-z.lsm"), resolver);
 
-        final ImagePlus normalized = presented.get();
-        require(normalized != null && normalized != source, "Batch Z source was not replaced");
-        require(sourceClosed.get(), "Batch Z source image was not closed");
-        require(normalized.getNChannels() == 2 && normalized.getNSlices() == 1, "Batch Z projection dimensions wrong");
-        require("bridge-z.lsm".equals(normalized.getTitle()), "Batch Z source title was not preserved");
-        require(normalized.getOriginalFileInfo() != null, "Batch Z source FileInfo missing");
-        require(
-            "C:\\source data\\".equals(normalized.getOriginalFileInfo().directory),
-            "Batch Z source directory was not preserved"
-        );
-        require(
-            macroArgument.get() != null &&
-                macroArgument.get().contains("image-id=" + normalized.getID()),
-            "Batch macro did not receive the projected image ID"
-        );
+            final ImagePlus normalized = presented.get();
+            require(normalized != null && normalized != source, "Batch Z source was not replaced");
+            require(sourceClosed.get(), "Batch Z source image was not closed");
+            require(normalized.getNChannels() == 2 && normalized.getNSlices() == 1, "Batch Z projection dimensions wrong");
+            require(normalized.getStack().getProcessor(1).get(0, 0) == 120, "Batch canonical muscle channel wrong");
+            require(normalized.getStack().getProcessor(2).get(0, 0) == 9, "Batch canonical nerve channel wrong");
+            require(normalized.getID() != source.getID(), "Batch canonical image reused source ID");
+            require("bridge-z.lsm".equals(normalized.getTitle()), "Batch Z source title was not preserved");
+            require(normalized.getOriginalFileInfo() != null, "Batch Z source FileInfo missing");
+            require(
+                "C:\\source data\\".equals(normalized.getOriginalFileInfo().directory),
+                "Batch Z source directory was not preserved"
+            );
+            require(
+                macroArgument.get() != null &&
+                    macroArgument.get().contains("image-id=" + normalized.getID()),
+                "Batch macro did not receive the projected image ID"
+            );
+            require(
+                macroArgument.get().contains("muscle-channel=1") &&
+                    macroArgument.get().contains("nerve-channel=2"),
+                "Batch macro did not receive canonical channel roles"
+            );
+            require(!sentinelClosed.get(), "Batch cleanup closed a pre-existing sentinel image");
+            final Path checkpoint = root.resolve(".anmj-morph-plus").resolve("session-v1.tsv");
+            final String checkpointText = Files.readString(checkpoint);
+            require(checkpointText.contains("\t3,1"), "Batch checkpoint did not preserve original 3,1 channel choice");
+        } finally {
+            for (ImagePlus image : presentedImages) {
+                Interpreter.removeBatchModeImage(image);
+            }
+            Interpreter.removeBatchModeImage(sentinel);
+        }
     }
 
     private static ImagePlus twoPlane(final int first, final int second) {
