@@ -59,7 +59,7 @@ def make_harness(source: str, image_path: Path, log_path: Path, rectangular: boo
         dispatch = f'''testFile = "{image}";
 rectFile = "{macro_path(rect_path)}";
 File.saveString("START\\n", testLog);
-run("Bio-Formats Importer", "open=[" + testFile + "] autoscale color_mode=Default view=Hyperstack stack_order=XYCZT");
+    openImageFile(testFile);
 File.append("STAGE 1 open image", testLog);
 makeRectangle(0, 0, 384, 512);
 run("Duplicate...", "title=[NMJ_1_rect_384x512.tif] duplicate");
@@ -76,7 +76,7 @@ run("Quit");
     else:
         dispatch = f'''testFile = "{image}";
 File.saveString("START\\n", testLog);
-run("Bio-Formats Importer", "open=[" + testFile + "] autoscale color_mode=Default view=Hyperstack stack_order=XYCZT");
+    openImageFile(testFile);
 File.append("STAGE 1 open image", testLog);
 processOpenImage(testFile);
 File.append("DONE stage 7", testLog);

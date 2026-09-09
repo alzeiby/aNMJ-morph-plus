@@ -40,24 +40,18 @@ function makeTiffFilename(prefix, title) {
   return prefix + title + ".tif";
 }
 
-function hasSupportedImageExtension(lowerName) {
-  return endsWith(lowerName, ".tif") ||
-         endsWith(lowerName, ".tiff") ||
-         endsWith(lowerName, ".lsm") ||
-         endsWith(lowerName, ".nd2") ||
-         endsWith(lowerName, ".czi") ||
-         endsWith(lowerName, ".lif") ||
-         endsWith(lowerName, ".png") ||
-         endsWith(lowerName, ".jpg") ||
-         endsWith(lowerName, ".jpeg") ||
-         endsWith(lowerName, ".bmp");
-}
-
 function openImageFile(fileName) {
   lowerName = toLowerCase(fileName);
   if (endsWith(lowerName, ".tif") || endsWith(lowerName, ".tiff")) {
     open(fileName);
-  } else if (hasSupportedImageExtension(lowerName)) {
+  } else if (endsWith(lowerName, ".lsm") ||
+             endsWith(lowerName, ".nd2") ||
+             endsWith(lowerName, ".czi") ||
+             endsWith(lowerName, ".lif") ||
+             endsWith(lowerName, ".png") ||
+             endsWith(lowerName, ".jpg") ||
+             endsWith(lowerName, ".jpeg") ||
+             endsWith(lowerName, ".bmp")) {
     run("Bio-Formats Importer", "open=[" + fileName + "] autoscale color_mode=Default view=Hyperstack stack_order=XYCZT");
   } else {
     exit("Error: Unsupported image format: " + fileName);
@@ -544,7 +538,16 @@ function batchProcess(directory) {
       }
     } else {
       lowerName = toLowerCase(fileName);
-      if (hasSupportedImageExtension(lowerName)) {
+      if (endsWith(lowerName, ".tif") ||
+          endsWith(lowerName, ".tiff") ||
+          endsWith(lowerName, ".lsm") ||
+          endsWith(lowerName, ".nd2") ||
+          endsWith(lowerName, ".czi") ||
+          endsWith(lowerName, ".lif") ||
+          endsWith(lowerName, ".png") ||
+          endsWith(lowerName, ".jpg") ||
+          endsWith(lowerName, ".jpeg") ||
+          endsWith(lowerName, ".bmp")) {
         openImageFile(fileName);
         processOpenImage(fileName);
       }
