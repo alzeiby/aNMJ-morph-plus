@@ -8,6 +8,8 @@ RUNTIME_VALIDATION_PATH = ROOT / "tests" / "runtime" / "run_validation.ps1"
 RUNTIME_VALIDATION = RUNTIME_VALIDATION_PATH.read_text(encoding="utf-8")
 FAILCLOSED_RUNNER_PATH = ROOT / "tests" / "runtime" / "run_source_copy_failclosed_probes.ps1"
 FAILCLOSED_BUILDER_PATH = ROOT / "tests" / "runtime" / "build_source_copy_failclosed_probes.py"
+TEMPLATE_FAILCLOSED_RUNNER_PATH = ROOT / "tests" / "runtime" / "run_template_copy_failclosed_probes.ps1"
+TEMPLATE_FAILCLOSED_BUILDER_PATH = ROOT / "tests" / "runtime" / "build_template_copy_failclosed_probes.py"
 
 
 def require(condition: bool, message: str) -> None:
@@ -100,6 +102,20 @@ def main() -> None:
     require("FALLBACK DUPLICATE RAN" in failclosed_runner, "Source-copy fail-closed runner does not reject fallback execution")
     require("UNEXPECTED RETURN" in failclosed_runner, "Source-copy fail-closed runner does not reject parser return")
     require("Assert-NoPinnedFijiProcess" in failclosed_runner, "Source-copy fail-closed runner does not prove Fiji cleanup")
+    require(TEMPLATE_FAILCLOSED_RUNNER_PATH.exists(), "Template-copy fail-closed fresh-Fiji runner is missing")
+    require(TEMPLATE_FAILCLOSED_BUILDER_PATH.exists(), "Template-copy fail-closed probe builder is missing")
+    template_failclosed_runner = TEMPLATE_FAILCLOSED_RUNNER_PATH.read_text(encoding="utf-8")
+    require("-WindowStyle Hidden" in template_failclosed_runner, "Template-copy fail-closed probes must launch hidden")
+    require("'--headless'" in template_failclosed_runner, "Template-copy fail-closed probes must use Fiji headless mode")
+    require(
+        "TEMPLATE FALLBACK DUPLICATE RAN" in template_failclosed_runner,
+        "Template-copy fail-closed runner does not reject fallback execution",
+    )
+    require("UNEXPECTED RETURN" in template_failclosed_runner, "Template-copy fail-closed runner does not reject parser return")
+    require(
+        "Assert-NoPinnedFijiProcess" in template_failclosed_runner,
+        "Template-copy fail-closed runner does not prove Fiji cleanup",
+    )
 
     # Rectangular-image calculation must use width * height, not the original square assumption.
     require(
@@ -199,6 +215,16 @@ def main() -> None:
     require(
         MACRO.count('run("Duplicate...", "title=[" + sourceCopyTitle + "] duplicate");') == 1,
         "Legacy initial source-copy Duplicate fallback changed",
+    )
+    require('templateCopyPrefix = ";template-copy-id=";' in MACRO, "Java template-copy bridge is missing")
+    require("templateImageId = suppliedTemplateCopyId;" in MACRO, "Supplied Java template-copy ID is not adopted")
+    require(
+        MACRO.count('exit("Error: Invalid template-copy-id supplied by Java");') >= 2,
+        "Invalid supplied template-copy IDs are not rejected fail-closed",
+    )
+    require(
+        MACRO.count('run("Duplicate...", "title=[" + templateTitle + "] duplicate");') == 1,
+        "Legacy template-copy Duplicate fallback changed",
     )
     require("templateImageId = getImageID();" in MACRO, "Template image ID is not captured")
     require("segmentImageId = getImageID();" in MACRO, "Segmentation image ID is not captured")

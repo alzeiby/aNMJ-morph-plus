@@ -41,6 +41,10 @@ public class ANMJMorphCommandTest {
         assertTrue(macro.contains("sourceCopyId = suppliedSourceCopyId;"));
         assertTrue(macro.contains("exit(\"Error: Invalid source-copy-id supplied by Java\");"));
         assertTrue(macro.contains("run(\"Duplicate...\", \"title=[\" + sourceCopyTitle + \"] duplicate\");"));
+        assertTrue(macro.contains("templateCopyPrefix = \";template-copy-id=\";"));
+        assertTrue(macro.contains("templateImageId = suppliedTemplateCopyId;"));
+        assertTrue(macro.contains("exit(\"Error: Invalid template-copy-id supplied by Java\");"));
+        assertTrue(macro.contains("run(\"Duplicate...\", \"title=[\" + templateTitle + \"] duplicate\");"));
         assertTrue(macro.contains("2/7 Threshold Nerve terminal."));
         assertTrue(macro.contains("Screen 6/7 Check segmented image."));
         assertTrue(macro.contains("totalLengthOfBranches = (imageWidth * imageHeight - counts0) * pixelSizeX;"));

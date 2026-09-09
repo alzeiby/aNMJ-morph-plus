@@ -109,6 +109,11 @@ jobs:
         run: |
           .\tests\runtime\run_source_copy_failclosed_probes.ps1 -FijiRoot $env:FIJI_ROOT -TimeoutSeconds 60
 
+      - name: Verify template-copy bridge fails closed
+        shell: powershell
+        run: |
+          .\tests\runtime\run_template_copy_failclosed_probes.ps1 -FijiRoot $env:FIJI_ROOT -TimeoutSeconds 60
+
       - name: Run fixture matrix and regression workflows
         shell: powershell
         run: |
