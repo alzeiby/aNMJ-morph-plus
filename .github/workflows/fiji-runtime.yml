@@ -27,6 +27,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
       - name: Cache pinned Fiji archive
         uses: actions/cache@v4
         with:
@@ -80,6 +87,18 @@ jobs:
           }
 
           "FIJI_ROOT=$fijiRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build Java plugin
+        run: mvn -B -ntp -DskipTests package
+
+      - name: Smoke-test Java plugin in fresh Fiji
+        shell: powershell
+        run: |
+          $jar = Get-ChildItem -LiteralPath .\target -Filter 'anmj-morph-plus-*.jar' |
+            Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-javadoc.jar' } |
+            Select-Object -First 1
+          if (-not $jar) { throw 'Could not find built aNMJ-morph+ plugin JAR' }
+          .\tests\runtime\run_java_plugin_smoke.ps1 -FijiRoot $env:FIJI_ROOT -PluginJar $jar.FullName -TimeoutSeconds 90
 
       - name: Run fixture matrix and regression workflows
         shell: powershell
