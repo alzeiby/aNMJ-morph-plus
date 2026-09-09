@@ -57,8 +57,26 @@ def main() -> None:
         require(marker in analysis, f"Direct ImageJ/Fiji operation changed or disappeared: {marker}")
 
     require(
-        "((double) width * height - counts0) * pixelSizeX" in analysis,
-        "Historical rectangular branch-length formula changed",
+        "AnisotropicSkeletonCalibration.effectivePixelSize(original.nerve)" in analysis,
+        "Branch-length workflow does not apply anisotropic skeleton calibration",
+    )
+    require(
+        "((double) width * height - counts0) * branchPixelSize" in analysis,
+        "Branch-length workflow no longer preserves the legacy skeleton-pixel-count estimator",
+    )
+    anisotropic_calibration = text(
+        "src/main/java/io/github/alzeiby/anmjmorphplus/AnisotropicSkeletonCalibration.java"
+    )
+    require(
+        "Double.compare(pixelWidth, pixelHeight) == 0" in anisotropic_calibration
+        and "return pixelWidth;" in anisotropic_calibration,
+        "Isotropic branch-length calibration must preserve the legacy pixel scale exactly",
+    )
+    require(
+        "horizontal * pixelWidth" in anisotropic_calibration
+        and "vertical * pixelHeight" in anisotropic_calibration
+        and "Math.hypot(pixelWidth, pixelHeight)" in anisotropic_calibration,
+        "Anisotropic branch-length calibration must use X/Y/diagonal skeleton orientation scaling",
     )
     require("setIm5D(false)" in analysis, "Overlap concatenation must not open as 4D")
     require("setIm5D(true)" in analysis, "Stage-6 concatenation must retain legacy 4D option")
@@ -87,7 +105,7 @@ def main() -> None:
     ):
         require(retired not in fiji_ci, f"Fresh-Fiji CI still runs retired migration probe: {retired}")
 
-    # Keep the immutable IJM reference scientifically recognizable until the final XY-method PR.
+    # The immutable IJM remains the historical pre-anisotropy scientific reference.
     require(
         "totalLengthOfBranches = (imageWidth * imageHeight - counts0) * pixelSizeX;" in macro,
         "Historical IJM reference formula changed unexpectedly",
