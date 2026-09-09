@@ -50,12 +50,17 @@ if (Test-Path -LiteralPath $classFile) {
 $separator = [IO.Path]::PathSeparator
 Copy-Item -LiteralPath $PluginJar -Destination $installedPlugin
 try {
+    $pluginDependencies = Get-ChildItem -LiteralPath $pluginsDir -Recurse -File -Filter '*.jar' |
+        Where-Object {
+            $_.FullName -ne $installedPlugin -and
+            $_.Name -notlike 'anmj-morph-plus-*.jar'
+        } |
+        ForEach-Object { $_.FullName }
     $classpath = @(
         $installedPlugin,
-        (Join-Path $FijiRoot 'jars\*'),
-        (Join-Path $FijiRoot 'plugins\*'),
-        $workDir
-    ) -join $separator
+        (Join-Path $FijiRoot 'jars\*')
+    ) + $pluginDependencies + @($workDir)
+    $classpath = $classpath -join $separator
 
     & $javac.FullName '-proc:none' '-cp' $classpath '-d' $workDir $source
     if ($LASTEXITCODE -ne 0) {

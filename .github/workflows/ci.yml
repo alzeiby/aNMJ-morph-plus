@@ -38,15 +38,12 @@ jobs:
       - name: Run repository checks
         run: python tests/repository_checks.py
 
-      - name: Check runtime harness generation
+      - name: Check runtime validators
         run: |
-          python -m py_compile tests/runtime/build_harnesses.py tests/runtime/build_fixture_probes.py tests/runtime/validate_outputs.py tests/runtime/validate_fixture_probe.py
-          python tests/runtime/build_harnesses.py --check
-          python tests/runtime/build_fixture_probes.py --check
-          python tests/runtime/validate_fixture_probe.py --check
+          python -m py_compile tests/runtime/validate_outputs.py tests/runtime/validate_direct_java_outputs.py
           python tests/runtime/validate_outputs.py --check-baseline
 
-      - name: Build Java plugin bridge
+      - name: Build Java plugin
         run: xvfb-run -a mvn -B -ntp verify
 
       - name: Check whitespace errors

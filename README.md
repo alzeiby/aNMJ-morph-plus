@@ -2,7 +2,7 @@
 
 A maintained Fiji/ImageJ adaptation of **aNMJ-morph** by **Abdullah Alzeiby** for quantitative neuromuscular junction (NMJ) morphology analysis.
 
-This fork preserves the original seven-step workflow while adding rectangular-image support, safer image dimensionality handling, broader batch input support, and automated repository checks. It is **not the official upstream aNMJ-morph distribution**.
+This fork preserves the original seven-step workflow as a Java/SciJava Fiji plugin while adding rectangular-image support, safer image dimensionality handling, broader batch input support, and automated repository checks. It is **not the official upstream aNMJ-morph distribution**.
 
 ## Highlights
 
@@ -20,7 +20,7 @@ This fork preserves the original seven-step workflow while adding rectangular-im
 
 ## Installation
 
-The project is being migrated from an ImageJ macro to a Java/SciJava Fiji plugin. The Java command is packaged as a normal Maven JAR and appears at **Analyze > Tools > aNMJ-morph+**. During the migration it delegates to the packaged canonical macro, so the scientific workflow remains unchanged while Java components replace it incrementally.
+The analysis runtime is implemented as a Java/SciJava Fiji plugin. The command is packaged as a normal Maven JAR and appears at **Analyze > Tools > aNMJ-morph+**. Image processing is delegated to the corresponding Fiji/ImageJ commands and APIs rather than reimplemented in project code.
 
 1. Install Fiji.
 2. Install the Binary Connectivity plugin.
@@ -30,11 +30,9 @@ The project is being migrated from an ImageJ macro to a Java/SciJava Fiji plugin
 
 Developers can also install a build directly with `mvn -Dscijava.app.directory=/path/to/Fiji.app/`.
 
-The root `aNMJ-morph macro.txt` remains the canonical reference implementation during the Java migration.
+The root `aNMJ-morph macro.txt` remains in the repository as a historical/scientific parity reference. It is not packaged into the plugin JAR and is not invoked at runtime.
 
-The Java layer now owns single-image selection plus batch traversal/session orchestration, supported-format routing, loading, and structural preflight. In batch mode, Java also performs deterministic structural normalization before handing the image to the canonical macro: RGB is converted to a three-channel ImageJ composite, explicit two-plane choices are applied, real Z stacks are maximum-intensity projected channel-by-channel, and the selected biological roles are reduced/reordered to muscle endplate first and nerve terminal second. TIFF inputs use ImageJ directly; the other supported formats use the pinned Bio-Formats API. Thresholds, segmentation, formulas, and scientific measurements remain in the macro during this migration.
-
-The macro expects Fiji's standard `StartupMacros.fiji.ijm` file in the Fiji macros directory.
+Java owns single-image selection, batch traversal/session orchestration, supported-format routing, loading, structural normalization, interactive review, measurements, segmentation, cleaned-image output, and the 29-column CSV. RGB conversion, Z projection, channel arrangement/splitting, thresholding, morphology operations, particle analysis, and related processing use Fiji/ImageJ implementations directly. TIFF inputs use ImageJ directly; microscopy formats that require it use Bio-Formats.
 
 ## Usage
 
@@ -74,7 +72,7 @@ The analysis image, threshold-reference copy, and segmentation copy all use the 
 
 ## Outputs
 
-The macro writes:
+The plugin writes:
 
 - `raw_data_table.csv` — quantitative measurements and derived spreadsheet formulas.
 - `cleaned_images/` — thresholded/intermediate TIFF images used by the workflow.
@@ -91,7 +89,7 @@ The original macro used one side length for frame-size calculations. aNMJ-morph+
 
 For square images this is mathematically equivalent to the original formula. The first two CSV metadata columns now contain `width x height` values rather than a single scalar side length, so downstream scripts that parse those columns may need to be updated.
 
-The branch-length calculation still assumes isotropic X/Y pixel calibration. The macro warns when X and Y pixel sizes differ.
+The branch-length calculation still assumes isotropic X/Y pixel calibration. The plugin warns when X and Y pixel sizes differ. Anisotropic X/Y handling is intentionally treated as a separate scientific-method change rather than part of the macro-retirement parity migration.
 
 ## Validation and scientific use
 
@@ -117,9 +115,9 @@ Original method and supporting references:
 
 ## Development
 
-GitHub Actions checks the repository on pushes and pull requests, including the rectangular-image formula, dimensionality guards, channel ordering, TIFF batch support, output naming, bundled reference images, licensing attribution, citation metadata, and basic macro syntax structure.
+GitHub Actions checks the repository on pushes and pull requests, including the rectangular-image formula, dimensionality guards, channel ordering, TIFF batch support, output naming, bundled reference images, licensing attribution, citation metadata, Java packaging, and the pinned fresh-Fiji numerical oracle.
 
-Tags matching `v*` validate the repository and build a release archive containing the installable Java plugin JAR, canonical macro, README, `LICENSE`, `CITATION.cff`, reference spreadsheet, reference images, and a SHA-256 checksum.
+Tags matching `v*` validate the repository and build a release archive containing the installable Java plugin JAR, README, `LICENSE`, `CITATION.cff`, reference spreadsheet, reference images, and a SHA-256 checksum. The historical IJM reference remains in the source repository rather than the runtime release package.
 
 ## License
 

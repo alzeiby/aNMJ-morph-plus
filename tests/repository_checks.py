@@ -2,14 +2,6 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MACRO_PATH = ROOT / "aNMJ-morph macro.txt"
-MACRO = MACRO_PATH.read_text(encoding="utf-8")
-RUNTIME_VALIDATION_PATH = ROOT / "tests" / "runtime" / "run_validation.ps1"
-RUNTIME_VALIDATION = RUNTIME_VALIDATION_PATH.read_text(encoding="utf-8")
-FAILCLOSED_RUNNER_PATH = ROOT / "tests" / "runtime" / "run_source_copy_failclosed_probes.ps1"
-FAILCLOSED_BUILDER_PATH = ROOT / "tests" / "runtime" / "build_source_copy_failclosed_probes.py"
-TEMPLATE_FAILCLOSED_RUNNER_PATH = ROOT / "tests" / "runtime" / "run_template_copy_failclosed_probes.ps1"
-TEMPLATE_FAILCLOSED_BUILDER_PATH = ROOT / "tests" / "runtime" / "build_template_copy_failclosed_probes.py"
 
 
 def require(condition: bool, message: str) -> None:
@@ -17,263 +9,89 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-def check_balanced_delimiters(text: str) -> None:
-    pairs = {")": "(", "]": "[", "}": "{"}
-    opening = set(pairs.values())
-    stack = []
-    in_string = False
-    escaped = False
-    in_line_comment = False
-    i = 0
-
-    while i < len(text):
-        char = text[i]
-        nxt = text[i + 1] if i + 1 < len(text) else ""
-
-        if in_line_comment:
-            if char == "\n":
-                in_line_comment = False
-            i += 1
-            continue
-
-        if in_string:
-            if escaped:
-                escaped = False
-            elif char == "\\":
-                escaped = True
-            elif char == '"':
-                in_string = False
-            i += 1
-            continue
-
-        if char == "/" and nxt == "/":
-            in_line_comment = True
-            i += 2
-            continue
-        if char == '"':
-            in_string = True
-            i += 1
-            continue
-
-        if char in opening:
-            stack.append(char)
-        elif char in pairs:
-            require(stack and stack[-1] == pairs[char], f"Unbalanced delimiter near character {i}: {char}")
-            stack.pop()
-        i += 1
-
-    require(not in_string, "Unterminated string literal")
-    require(not stack, f"Unclosed delimiter(s): {stack}")
+def text(path: str) -> str:
+    return (ROOT / path).read_text(encoding="utf-8")
 
 
 def main() -> None:
-    require(MACRO_PATH.exists(), "Macro file is missing")
-    check_balanced_delimiters(MACRO)
+    production_files = sorted((ROOT / "src" / "main" / "java").rglob("*.java"))
+    production = "\n".join(path.read_text(encoding="utf-8") for path in production_files)
+    pom = text("pom.xml")
+    analysis = text("src/main/java/io/github/alzeiby/anmjmorphplus/AnalysisWorkflow.java")
+    batch = text("src/main/java/io/github/alzeiby/anmjmorphplus/BatchSessionRunner.java")
+    single = text("src/main/java/io/github/alzeiby/anmjmorphplus/InputWorkflowRunner.java")
+    csv_writer = text("src/main/java/io/github/alzeiby/anmjmorphplus/CsvOutputWriter.java")
+    runtime = text("tests/runtime/run_direct_java_analysis.ps1")
+    runtime_java = text("tests/runtime/DirectJavaAnalysisRuntime.java")
+    fiji_ci = text(".github/workflows/fiji-runtime.yml")
+    macro = text("aNMJ-morph macro.txt")
 
-    # fiji.bat is only a launcher wrapper; its exit must not end trace polling
-    # before the Fiji child has reached the requested completion marker.
-    poll_start = RUNTIME_VALIDATION.index("while ((Get-Date) -lt $deadline) {")
-    post_poll_refresh = RUNTIME_VALIDATION.index("$process.Refresh()", poll_start)
-    poll_region = RUNTIME_VALIDATION[poll_start:post_poll_refresh]
-    require(
-        "$process.HasExited" not in poll_region,
-        "Runtime validation must not inspect wrapper HasExited while polling for Fiji completion",
-    )
-    require(
-        RUNTIME_VALIDATION.count("$process.HasExited") == 1
-        and "if (-not $process.HasExited)" in RUNTIME_VALIDATION[post_poll_refresh:],
-        "Runtime validation must use wrapper HasExited only for post-poll cleanup",
-    )
-    require(
-        "while ((Get-Date) -lt $deadline)" in RUNTIME_VALIDATION
-        and 'if ($traceText -like "*$CompletionMarker*")' in RUNTIME_VALIDATION,
-        "Runtime validation must remain completion-marker/deadline driven",
-    )
-    require(
-        "Start-Process -FilePath $fijiLauncher" in RUNTIME_VALIDATION
-        and "-PassThru -WindowStyle Hidden" in RUNTIME_VALIDATION,
-        "Runtime validation must continue launching Fiji through the hidden wrapper",
-    )
-    require(FAILCLOSED_RUNNER_PATH.exists(), "Source-copy fail-closed fresh-Fiji runner is missing")
-    require(FAILCLOSED_BUILDER_PATH.exists(), "Source-copy fail-closed probe builder is missing")
-    failclosed_runner = FAILCLOSED_RUNNER_PATH.read_text(encoding="utf-8")
-    require("-WindowStyle Hidden" in failclosed_runner, "Source-copy fail-closed probes must launch hidden")
-    require("'--headless'" in failclosed_runner, "Source-copy fail-closed probes must use Fiji headless mode")
-    require("FALLBACK DUPLICATE RAN" in failclosed_runner, "Source-copy fail-closed runner does not reject fallback execution")
-    require("UNEXPECTED RETURN" in failclosed_runner, "Source-copy fail-closed runner does not reject parser return")
-    require("Assert-NoPinnedFijiProcess" in failclosed_runner, "Source-copy fail-closed runner does not prove Fiji cleanup")
-    require(TEMPLATE_FAILCLOSED_RUNNER_PATH.exists(), "Template-copy fail-closed fresh-Fiji runner is missing")
-    require(TEMPLATE_FAILCLOSED_BUILDER_PATH.exists(), "Template-copy fail-closed probe builder is missing")
-    template_failclosed_runner = TEMPLATE_FAILCLOSED_RUNNER_PATH.read_text(encoding="utf-8")
-    require("-WindowStyle Hidden" in template_failclosed_runner, "Template-copy fail-closed probes must launch hidden")
-    require("'--headless'" in template_failclosed_runner, "Template-copy fail-closed probes must use Fiji headless mode")
-    require(
-        "TEMPLATE FALLBACK DUPLICATE RAN" in template_failclosed_runner,
-        "Template-copy fail-closed runner does not reject fallback execution",
-    )
-    require("UNEXPECTED RETURN" in template_failclosed_runner, "Template-copy fail-closed runner does not reject parser return")
-    require(
-        "Assert-NoPinnedFijiProcess" in template_failclosed_runner,
-        "Template-copy fail-closed runner does not prove Fiji cleanup",
-    )
+    # The IJM file remains a historical/scientific reference, never a runtime dependency.
+    require("IJ.runMacro" not in production, "Production Java still invokes IJM")
+    require("LegacyMacroRunner" not in production, "LegacyMacroRunner still exists in production")
+    require("EarlySplitChannelsBridge" not in production, "Macro split bridge still exists in production")
+    require("SourceCopyDuplicator" not in production, "Transition duplicate wrapper still exists in production")
+    require("TemplateCopyDuplicator" not in production, "Transition duplicate wrapper still exists in production")
+    require("aNMJ-morph macro.txt" not in pom, "Legacy macro is still packaged into the plugin JAR")
 
-    # Rectangular-image calculation must use width * height, not the original square assumption.
-    require(
-        "totalLengthOfBranches = (imageWidth * imageHeight - counts0) * pixelSizeX;" in MACRO,
-        "Rectangular branch-length calculation is missing",
-    )
-    require(
-        "(A' + rowNumber + '*A' + rowNumber" not in MACRO,
-        "Legacy square-only branch-length spreadsheet formula returned",
-    )
+    # Both interactive entry points must converge on the same direct Java scientific workflow.
+    require("new JavaBatchFileProcessor()" in batch, "Batch mode is not routed to direct Java analysis")
+    require("new SingleImageAnalysisRunner()" in single, "Single-image mode is not routed to direct Java analysis")
+    require("new AnalysisWorkflow" in text("src/main/java/io/github/alzeiby/anmjmorphplus/JavaBatchFileProcessor.java"),
+            "Batch processor does not use AnalysisWorkflow")
+    require("new AnalysisWorkflow" in text("src/main/java/io/github/alzeiby/anmjmorphplus/SingleImageAnalysisRunner.java"),
+            "Single-image processor does not use AnalysisWorkflow")
 
-    # Dimensionality handling must not silently reinterpret ambiguous data.
-    require("if (frames > 1)" in MACRO, "Time-series inputs are not explicitly rejected")
-    require("Two-plane image detected" in MACRO, "Ambiguous C=1/Z=2 inputs are not surfaced to the user")
-    require("Two channels (Keyence/two-page export)" in MACRO, "Keyence two-page interpretation option is missing")
-    require("Z stack (maximum-project)" in MACRO, "Z-stack interpretation option is missing")
+    # Preserve the scientific method while delegating image operations to ImageJ/Fiji.
+    for marker in (
+        'IJ.run(original.nerve, "Threshold...", "")',
+        'IJ.run(original.nerve, "Despeckle", "")',
+        'IJ.run(original.nerve, "Skeletonize", "")',
+        'IJ.run(original.nerve, "BinaryConnectivity ", "white")',
+        'IJ.run(original.muscle, "Subtract Background...", "rolling=50 create")',
+        'IJ.run(segment.muscle, "Find Maxima...", "noise=10 output=[Segmented Particles]")',
+        'IJ.run(finalAverage, "Analyze Particles...", "display summarize")',
+        'ZProjector.run(overlapConcat, "avg")',
+        'ZProjector.run(finalConcat, "avg")',
+    ):
+        require(marker in analysis, f"Direct ImageJ/Fiji operation changed or disappeared: {marker}")
 
-    # The primary, threshold template, and segmentation copy must use the same channel ordering.
-    arrange_call = 'run("Arrange Channels...", "new=" + muscleEndplateChannel + \'\' + nerveTerminalChannel);'
-    require(MACRO.count(arrange_call) == 3, "Expected exactly three legacy channel-ordering calls")
     require(
-        'channelsCanonical = indexOf(";" + javaArgument + ";", ";channels-canonical=1;") >= 0;' in MACRO,
-        "Java canonical-channel bridge flag is not parsed",
+        "((double) width * height - counts0) * pixelSizeX" in analysis,
+        "Historical rectangular branch-length formula changed",
     )
-    require(
-        MACRO.count("if (!channelsCanonical) {") == 3,
-        "All three legacy channel-ordering calls must be skipped only for Java-canonical batch input",
-    )
+    require("setIm5D(false)" in analysis, "Overlap concatenation must not open as 4D")
+    require("setIm5D(true)" in analysis, "Stage-6 concatenation must retain legacy 4D option")
+    require("new BrushTool().run(\"\")" in analysis, "Paintbrush must use ImageJ BrushTool directly")
+    require("Paintbrush Tool Options..." not in analysis, "Macro-only paintbrush command returned")
 
-    # Batch processing must support TIFF rather than excluding it globally.
-    require('endsWith(lowerName, ".tif")' in MACRO, "TIFF is not included in supported batch formats")
-    require('endsWith(lowerName, ".tiff")' in MACRO, "TIFF extension variant is not supported")
-    require('if (!endsWith(fileName, ".tif"))' not in MACRO, "Legacy TIFF-wide batch exclusion returned")
-    require("cleaned_images" in MACRO, "Generated output directory is not excluded from recursive batch traversal")
+    # The Java writer owns the exact historical raw table shape/formulas.
+    require("header1()" in csv_writer and "header2()" in csv_writer, "CSV headers are not owned by Java")
+    for formula in ("=J", "=(K", 'DECIMAL + "28"', "=LOG10(M", "=IF(AA"):
+        require(formula in csv_writer, f"Historical CSV formula missing: {formula}")
 
-    # Batch and CSV I/O should avoid unnecessary parsing and rewriting work.
-    require("function hasSupportedImageExtension" not in MACRO, "ImageJ1 boolean extension helper must not be reintroduced")
-    require("function openImageFile(fileName)" in MACRO, "Image opening is not centralized")
-    require(
-        'if (endsWith(lowerName, ".tif") || endsWith(lowerName, ".tiff"))' in MACRO,
-        "TIFF batch inputs are not using the established native ImageJ open path",
-    )
-    require(MACRO.count('openImageFile(fileName);') >= 2, "Batch/single-image paths are not both routed through the common image opener")
-    for extension in (".lsm", ".nd2", ".czi", ".lif", ".png", ".jpg", ".jpeg", ".bmp"):
-        require(
-            f'endsWith(lowerName, "{extension}")' in MACRO,
-            f"Supported image extension is missing from inline ImageJ routing: {extension}",
-        )
-    require('Dialog.addChoice("Analyze", newArray("Single image", "Batch folder"));' in MACRO, "Single-image file selection mode is missing")
-    require('fileName = File.openDialog("Select image to analyze");' in MACRO, "Single-image file picker is missing")
-    require('originalTitle = File.getName(getTitle());' in MACRO, "Bio-Formats titles are not normalized to a basename")
-    require('rename(originalTitle);' in MACRO, "Normalized Bio-Formats basename is not applied to the image window")
-    require('inputTitle = File.getName(originalTitle);' in MACRO, "Stable input basename is not preserved for output naming")
-    require('inputTitle + columnSeparator +' in MACRO, "CSV image name is not based on the stable input basename")
-    require('makeTiffFilename("axon_terminal", inputTitle)' in MACRO, "Axon output filename is not based on the stable input basename")
-    require('makeTiffFilename("muscle_endplate", inputTitle)' in MACRO, "Endplate output filename is not based on the stable input basename")
-    require('rename(axonFilename);' in MACRO, "Reopened axon TIFF is not assigned its stable window title")
-    require('rename(endplateFilename);' in MACRO, "Reopened endplate TIFF is not assigned its stable window title")
-    require('rename(endplateIntermediateFilename);' in MACRO, "Reopened intermediate TIFF is not assigned its stable window title")
-    require("canOpenDirectly" not in MACRO, "Non-TIFF native-open shortcut should not bypass Bio-Formats")
-    require('File.append(output, outputFilename);' in MACRO, "CSV rows are not appended incrementally")
-    require("File.saveString(fileContents + output, outputFilename);" not in MACRO, "CSV output still rewrites the entire existing file")
-    require("fileLength = File.length(outputFilename);" in MACRO, "Existing CSV length is not recorded")
-    require("if (fileLength > 0)" in MACRO, "Empty output files are not handled explicitly")
-    require('File.openAsRawString(outputFilename, fileLength)' in MACRO, "CSV newline detection is not using physical file contents")
-    require('File.openAsString(outputFilename)' not in MACRO, "Normalized text reads cannot detect a missing final newline")
-    require('File.append("\\n", outputFilename);' not in MACRO, "CSV separator append would insert a blank row")
-    require('File.append("", outputFilename);' in MACRO, "Legacy CSV rows without a newline are not terminated safely")
-    require('File.saveString(line1 + "\\n" + line2 + "\\n", outputFilename);' in MACRO, "Missing/empty CSV header initialization changed")
-    require("rowNumber = 3;" in MACRO, "First data row should remain spreadsheet row 3")
+    # Fresh-Fiji validation must execute Java directly with the legacy macro physically absent.
+    require("legacy/aNMJ-morph macro.txt" in runtime, "Direct runtime no longer removes/asserts legacy resource absence")
+    require("DirectJavaAnalysisRuntime" in runtime, "Direct Java runtime harness is not launched")
+    require("LegacyMacroRunner" not in runtime_java and "IJ.runMacro" not in runtime_java,
+            "Direct Java runtime harness depends on IJM")
+    require("-WindowStyle Hidden" in runtime, "Direct Java runtime must launch hidden")
+    require("-Runs 2" in fiji_ci and "run_direct_java_analysis.ps1" in fiji_ci,
+            "Fresh-Fiji CI is not running the direct Java Runs=2 oracle")
+    for retired in (
+        "run_validation_with_plugin.ps1",
+        "run_source_copy_failclosed_probes.ps1",
+        "run_template_copy_failclosed_probes.ps1",
+        "run_split_channels_jit_probe.ps1",
+        "run_split_channels_failclosed_probe.ps1",
+    ):
+        require(retired not in fiji_ci, f"Fresh-Fiji CI still runs retired migration probe: {retired}")
 
-    # Multiple-open-image mode must explicitly select the image it passes to processOpenImage.
-    require("safeSelectWindow(list[0]);" in MACRO, "The first listed image is not explicitly selected before analysis")
-
-    # Avoid unnecessary UI and measurement work in the interactive path.
+    # Keep the immutable IJM reference scientifically recognizable until the final XY-method PR.
     require(
-        'if (nImages > 0 && getInfo("window.title") == windowTitle && getTitle() == windowTitle)' in MACRO,
-        "Redundant window selections are not short-circuited using the front-most window",
+        "totalLengthOfBranches = (imageWidth * imageHeight - counts0) * pixelSizeX;" in macro,
+        "Historical IJM reference formula changed unexpectedly",
     )
-    require(
-        "if (getTitle() == windowTitle)" not in MACRO,
-        "Window short-circuit must not use the current image title for non-image windows",
-    )
-    require("getLocationAndSize(x2, y2, width2, height2);" not in MACRO, "Unused template-window geometry query returned")
-    require("resultsArray = newArray(resultsCount);" in MACRO, "Axon measurement array is not preallocated")
-    require("Array.concat(resultsArray" not in MACRO, "Axon measurements still reallocate the array on each result")
-
-    # Stateful ImageJ channel operations must target deterministic image IDs.
-    require("originalImageId = getImageID();" in MACRO, "Original image ID is not captured before duplication")
-    require("sourceCopyId = getImageID();" in MACRO, "Source-copy image ID is not captured")
-    require('sourceCopyPrefix = ";source-copy-id=";' in MACRO, "Java source-copy bridge is missing")
-    require("sourceCopyId = suppliedSourceCopyId;" in MACRO, "Supplied Java source-copy ID is not adopted")
-    require(
-        MACRO.count('exit("Error: Invalid source-copy-id supplied by Java");') >= 2,
-        "Invalid supplied source-copy IDs are not rejected fail-closed",
-    )
-    require(
-        MACRO.count('run("Duplicate...", "title=[" + sourceCopyTitle + "] duplicate");') == 1,
-        "Legacy initial source-copy Duplicate fallback changed",
-    )
-    require('templateCopyPrefix = ";template-copy-id=";' in MACRO, "Java template-copy bridge is missing")
-    require("templateImageId = suppliedTemplateCopyId;" in MACRO, "Supplied Java template-copy ID is not adopted")
-    require(
-        MACRO.count('exit("Error: Invalid template-copy-id supplied by Java");') >= 2,
-        "Invalid supplied template-copy IDs are not rejected fail-closed",
-    )
-    require(
-        MACRO.count('run("Duplicate...", "title=[" + templateTitle + "] duplicate");') == 1,
-        "Legacy template-copy Duplicate fallback changed",
-    )
-    require("templateImageId = getImageID();" in MACRO, "Template image ID is not captured")
-    require("segmentImageId = getImageID();" in MACRO, "Segmentation image ID is not captured")
-    require(MACRO.count("selectImage(originalImageId);") >= 3, "Original analysis flow is not image-ID selected")
-    require(MACRO.count("selectImage(templateImageId);") >= 2, "Template Arrange/Split flow is not image-ID selected")
-    require(MACRO.count("selectImage(segmentImageId);") >= 2, "Stage-6 Arrange/Split flow is not image-ID selected")
-    require(
-        'imageDimensionsPixels = "" + imageWidth + " x " + imageHeight;' in MACRO,
-        "Pixel dimensions do not force ImageJ string context",
-    )
-    require(
-        'imageDimensionsMetric = "" + formatNumber(metricWidth) + " x " + formatNumber(metricHeight) + sizeUnit;' in MACRO,
-        "Metric dimensions do not force ImageJ string context",
-    )
-
-    # Diagnostic mode must remain useful.
-    diagnostic_markers = [
-        "Axon diameter:",
-        "Nerve terminal area:",
-        "Nerve terminal perimeter:",
-        "AChR area:",
-        "AChR perimeter:",
-        "Endplate diameter:",
-        "Endplate area:",
-        "Endplate perimeter:",
-        "Unoccupied AChR Area:",
-        "Number of clusters:",
-    ]
-    for marker in diagnostic_markers:
-        require(marker in MACRO, f"Diagnostic output missing: {marker}")
-
-    # Preserve historical cleaned-image filename prefixes.
-    require('makeTiffFilename("axon_terminal", inputTitle)' in MACRO, "Axon output filename prefix changed")
-    require('makeTiffFilename("muscle_endplate", inputTitle)' in MACRO, "Endplate output filename prefix changed")
-
-    reference_images = sorted((ROOT / "Reference Images").glob("*.lsm"))
-    require(len(reference_images) == 20, f"Expected 20 reference LSM images, found {len(reference_images)}")
-
-    license_text = (ROOT / "LICENSE").read_text(encoding="utf-8", errors="replace")
-    require("Creative Commons Attribution 4.0 International" in license_text, "CC BY 4.0 license notice is missing")
-    require("https://doi.org/10.7488/ds/2625" in license_text, "Original dataset attribution is missing from LICENSE")
-    require("Abdullah Alzeiby" in license_text, "aNMJ-morph+ author attribution is missing from LICENSE")
-
-    citation_path = ROOT / "CITATION.cff"
-    require(citation_path.exists(), "CITATION.cff is missing")
-    citation_text = citation_path.read_text(encoding="utf-8", errors="replace")
-    require('family-names: "Alzeiby"' in citation_text, "CITATION.cff is missing the aNMJ-morph+ author")
-    require('given-names: "Abdullah"' in citation_text, "CITATION.cff is missing the aNMJ-morph+ author")
-    require("https://github.com/alzeiby/aNMJ-morph-plus" in citation_text, "CITATION.cff repository URL is missing")
 
     print("Repository checks passed")
 
