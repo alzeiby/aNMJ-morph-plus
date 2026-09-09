@@ -3,14 +3,10 @@ package io.github.alzeiby.anmjmorphplus;
 import ij.ImagePlus;
 import ij.io.DirectoryChooser;
 import ij.io.FileInfo;
-import ij.plugin.ChannelArranger;
 
 import java.nio.file.Path;
-import java.util.Objects;
 
 final class SingleImageAnalysisRunner {
-
-    static final int IMAGEJ_ARRANGER_MAX_CHANNELS = 9;
 
     private final StructuralNormalizer structuralNormalizer = new StructuralNormalizer();
     private final AnalysisWorkflow analysisWorkflow = new AnalysisWorkflow();
@@ -37,6 +33,26 @@ final class SingleImageAnalysisRunner {
         analyzeSelected(image, inputPath, chooseChannels(image.getNChannels()));
     }
 
+    void analyzeBatch(ImagePlus image, final Path inputPath, final BatchChoiceResolver choices) {
+        final InputNormalization normalization = StructuralNormalizer.normalizationFor(image);
+        if (normalization == InputNormalization.REJECT_TIME_SERIES) {
+            throw new IllegalArgumentException(InputWorkflowRunner.TIME_SERIES_ERROR);
+        }
+        final SupportedImageFormat format = SupportedImageFormat.fromName(inputPath.getFileName().toString())
+            .orElseThrow(() -> new IllegalArgumentException("Unsupported image format: " + inputPath));
+        final TwoPlaneInterpretation twoPlane = normalization == InputNormalization.CHOOSE_TWO_PLANE_INTERPRETATION
+            ? choices.resolveTwoPlane(BatchChoiceResolver.signature(format, image, normalization, null))
+            : null;
+        final String signature = BatchChoiceResolver.signature(
+            format, image, normalization, twoPlane == null ? null : twoPlane.name()
+        );
+        image = normalizeAndPresent(image, twoPlane, true);
+        if (image.getNChannels() < 2) {
+            throw new IllegalArgumentException("At least two channels are required to select muscle endplate and nerve terminal");
+        }
+        analyzeSelected(image, inputPath, choices.resolveChannels(signature, image.getNChannels()));
+    }
+
     ImagePlus normalizeAndPresent(
         ImagePlus image,
         final TwoPlaneInterpretation twoPlane,
@@ -56,67 +72,12 @@ final class SingleImageAnalysisRunner {
     }
 
     void analyzeSelected(
-        ImagePlus image,
-        final Path inputPath,
-        final BatchChoiceResolver.ChannelChoice selected
-    ) {
-        BatchChoiceResolver.ChannelChoice analysisChoice = selected;
-        boolean channelsCanonical = false;
-        if (image.getNChannels() <= IMAGEJ_ARRANGER_MAX_CHANNELS) {
-            image = canonicalizeSelected(image, selected);
-            analysisChoice = new BatchChoiceResolver.ChannelChoice(1, 2);
-            channelsCanonical = image.getNChannels() == 2 && image.isComposite();
-        }
-
-        analyzeCanonical(image, inputPath, analysisChoice, channelsCanonical);
-    }
-
-    ImagePlus canonicalizeSelected(
-        final ImagePlus image,
-        final BatchChoiceResolver.ChannelChoice selected
-    ) {
-        final ImagePlus canonical = canonicalize(image, selected);
-        if (canonical != image) {
-            canonical.show();
-        }
-        return canonical;
-    }
-
-    static ImagePlus canonicalize(
-        final ImagePlus image,
-        final BatchChoiceResolver.ChannelChoice selected
-    ) {
-        Objects.requireNonNull(image, "image");
-        Objects.requireNonNull(selected, "selected");
-        if (image.getNChannels() > IMAGEJ_ARRANGER_MAX_CHANNELS ||
-            image.getNChannels() == 2 && selected.muscleEndplateChannel == 1 && selected.nerveTerminalChannel == 2) {
-            return image;
-        }
-
-        final ImagePlus canonical = ChannelArranger.run(
-            image,
-            new int[] {selected.muscleEndplateChannel, selected.nerveTerminalChannel}
-        );
-        if (canonical == null) {
-            throw new IllegalStateException("ImageJ could not arrange the selected channels");
-        }
-        canonical.setTitle(image.getTitle());
-        canonical.setCalibration(image.getCalibration());
-        canonical.setFileInfo(image.getOriginalFileInfo());
-        return canonical;
-    }
-
-    void analyzeCanonical(
         final ImagePlus image,
         final Path inputPath,
-        final BatchChoiceResolver.ChannelChoice analysisChoice,
-        final boolean channelsCanonical
+        final BatchChoiceResolver.ChannelChoice selected
     ) {
         analysisWorkflow.analyze(
-            image,
-            inputPath,
-            analysisChoice,
-            channelsCanonical,
+            image, inputPath, selected,
             result -> outputWriter.append(AnalysisOutputPaths.forInput(inputPath).csv, result)
         );
     }

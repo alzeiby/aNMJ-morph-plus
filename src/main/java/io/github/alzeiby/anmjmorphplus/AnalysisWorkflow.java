@@ -8,6 +8,8 @@ import ij.gui.GenericDialog;
 import ij.gui.NonBlockingGenericDialog;
 import ij.gui.Toolbar;
 import ij.measure.ResultsTable;
+import ij.plugin.ChannelArranger;
+import ij.plugin.ChannelSplitter;
 import ij.plugin.Concatenator;
 import ij.plugin.ZProjector;
 import ij.plugin.filter.Analyzer;
@@ -47,7 +49,6 @@ final class AnalysisWorkflow {
         final ImagePlus image,
         final Path inputPath,
         final BatchChoiceResolver.ChannelChoice channelChoice,
-        final boolean channelsCanonical,
         final Consumer<AnalysisResult> resultConsumer
     ) {
         final AnalysisOutputPaths paths = AnalysisOutputPaths.forInput(inputPath);
@@ -66,15 +67,14 @@ final class AnalysisWorkflow {
 
         final ImagePlus sourceCopy = duplicate(image, "__aNMJ_source_" + image.getID());
         final ImagePlus templateCopy = duplicate(sourceCopy, "__aNMJ_template_" + sourceCopy.getID());
-        final Channels original = splitSelected(image, channelChoice, channelsCanonical);
-        final Channels template = splitSelected(templateCopy, channelChoice, channelsCanonical);
+        final Channels original = splitSelected(image, channelChoice);
+        final Channels template = splitSelected(templateCopy, channelChoice);
 
         selectPaintbrush();
         Toolbar.setForegroundColor(Color.BLACK);
 
         makeCurrent(original.nerve);
         IJ.run(original.nerve, "Threshold...", "");
-        positionPair(original.nerve, template.nerve);
         prompter.review(original.nerve, SCREEN2);
         final String thresholdNerve = ThresholdAdjuster.getMethod();
         Prefs.blackBackground = false;
@@ -86,7 +86,6 @@ final class AnalysisWorkflow {
 
         makeCurrent(original.muscle);
         IJ.run(original.muscle, "Threshold...", "");
-        positionPair(original.muscle, template.muscle);
         prompter.review(original.muscle, SCREEN3);
         final String thresholdEndplate = ThresholdAdjuster.getMethod();
         IJ.run(original.muscle, "Make Binary", "thresholded remaining black");
@@ -157,7 +156,7 @@ final class AnalysisWorkflow {
         closeImage(overlapAverage);
 
         final ImagePlus segmentCopy = duplicate(sourceCopy, "__aNMJ_segment_" + sourceCopy.getID());
-        final Channels segment = splitSelected(segmentCopy, channelChoice, channelsCanonical);
+        final Channels segment = splitSelected(segmentCopy, channelChoice);
         closeImage(segment.nerve);
         IJ.run(segment.muscle, "Make Binary", "");
         IJ.run(segment.muscle, "Find Maxima...", "noise=10 output=[Segmented Particles]");
@@ -210,53 +209,37 @@ final class AnalysisWorkflow {
             numberOfClusters
         );
         resultConsumer.accept(result);
-        prompter.review(
-            finalAverage,
-            "7/7 Congratulations- 'aNMJ-morph is now complete! \n-\nPress OK. \nImages will be closed down and measurements will be saved onto a raw_data_table document."
-        );
         closeImage(finalConcat);
         closeImage(finalAverage);
     }
 
     private static ImagePlus duplicate(final ImagePlus source, final String title) {
         IJ.run(source, "Duplicate...", "title=[" + title + "] duplicate");
-        final ImagePlus copy = currentRequired("Duplicate");
-        if (copy == source || !title.equals(copy.getTitle())) {
-            throw new IllegalStateException("ImageJ Duplicate... did not create expected image " + title);
-        }
-        return copy;
+        return currentRequired("Duplicate");
     }
 
     private static Channels splitSelected(
         final ImagePlus source,
-        final BatchChoiceResolver.ChannelChoice choice,
-        final boolean channelsCanonical
+        final BatchChoiceResolver.ChannelChoice choice
     ) {
-        makeCurrent(source);
         ImagePlus selected = source;
-        if (!channelsCanonical) {
-            IJ.run(source, "Arrange Channels...", "new=" +
-                choice.muscleEndplateChannel + choice.nerveTerminalChannel);
-            selected = currentRequired("Arrange Channels");
+        if (source.getNChannels() <= 9 &&
+            (source.getNChannels() != 2 || choice.muscleEndplateChannel != 1 || choice.nerveTerminalChannel != 2)) {
+            selected = ChannelArranger.run(source,
+                new int[] {choice.muscleEndplateChannel, choice.nerveTerminalChannel});
+            if (selected == null) throw new IllegalStateException("Could not arrange selected channels");
+            selected.setCalibration(source.getCalibration());
         }
-        selected.setC(1);
-        final String title = selected.getTitle();
-        IJ.run(selected, "Split Channels", "");
-        final ImagePlus muscle = WindowManager.getImage("C1-" + title);
-        final ImagePlus nerve = WindowManager.getImage("C2-" + title);
-        if (muscle == null || nerve == null) {
-            throw new IllegalStateException("ImageJ Split Channels did not create C1/C2 for " + title);
-        }
-        return new Channels(muscle, nerve);
+        final ImagePlus[] split = ChannelSplitter.split(selected);
+        if (selected.getWindow() != null) closeImage(selected);
+        split[0].show();
+        split[1].show();
+        return new Channels(split[0], split[1]);
     }
 
     private static AnalysisResult.Measurement measure(final ImagePlus image) {
         final ResultsTable table = Analyzer.getResultsTable();
-        final int before = table.size();
         IJ.run(image, "Measure", "");
-        if (table.size() <= before) {
-            throw new IllegalStateException("ImageJ Measure did not append a Results row");
-        }
         final int row = table.size() - 1;
         return new AnalysisResult.Measurement(
             table.getValue("Area", row),
@@ -278,17 +261,11 @@ final class AnalysisWorkflow {
 
     private static double summaryCount() {
         final ResultsTable summary = ResultsTable.getResultsTable("Summary");
-        if (summary == null || summary.size() == 0) {
-            throw new IllegalStateException("Analyze Particles did not create Summary results");
-        }
         return summary.getValue("Count", summary.size() - 1);
     }
 
     private static ImagePlus openTiff(final Path path) {
         final ImagePlus image = IJ.openImage(path.toString());
-        if (image == null) {
-            throw new IllegalStateException("Could not open intermediate TIFF: " + path);
-        }
         image.show();
         makeCurrent(image);
         return image;
@@ -302,20 +279,7 @@ final class AnalysisWorkflow {
         return current;
     }
 
-    private static void positionPair(final ImagePlus subject, final ImagePlus reference) {
-        if (subject.getWindow() == null || reference.getWindow() == null) {
-            return;
-        }
-        final int width = subject.getWindow().getWidth();
-        subject.getWindow().setLocation(50, 50);
-        reference.getWindow().setLocation(100 + width, 50);
-        makeCurrent(subject);
-    }
-
     private static void makeCurrent(final ImagePlus image) {
-        if (image == null) {
-            throw new IllegalStateException("Cannot select a closed image");
-        }
         if (image.getWindow() != null) {
             IJ.selectWindow(image.getID());
         } else {
@@ -337,31 +301,13 @@ final class AnalysisWorkflow {
     }
 
     private void installPaintbrush(final int width) {
-        // Use ImageJ's built-in paintbrush PlugInTool directly. The legacy macro's
-        // Paintbrush Tool Options command belongs to StartupMacros and is not guaranteed
-        // to be installed in a clean Fiji runtime.
-        selectPaintbrush();
+        new BrushTool().run("");
+        paintbrushToolId = Toolbar.getToolId();
         BrushTool.setBrushWidth(width);
     }
 
     private void selectPaintbrush() {
-        final Toolbar toolbar = Toolbar.getInstance();
-        if (toolbar == null) {
-            throw new IllegalStateException("ImageJ toolbar is unavailable");
-        }
-        if (paintbrushToolId < 0) {
-            new BrushTool().run("");
-            paintbrushToolId = Toolbar.getToolId();
-        }
-        toolbar.setTool(paintbrushToolId);
-        if (!(Toolbar.getPlugInTool() instanceof BrushTool)) {
-            new BrushTool().run("");
-            paintbrushToolId = Toolbar.getToolId();
-            toolbar.setTool(paintbrushToolId);
-        }
-        if (!(Toolbar.getPlugInTool() instanceof BrushTool)) {
-            throw new IllegalStateException("ImageJ Paintbrush Tool could not be installed");
-        }
+        Toolbar.getInstance().setTool(paintbrushToolId);
     }
 
     private static void closeWindow(final String title) {
