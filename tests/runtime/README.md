@@ -34,7 +34,7 @@ Generated files live under `tests/runtime/_work/` and are intentionally ignored 
 
 ## CI scope
 
-GitHub Actions verifies that `build_harnesses.py` can still transform the current production macro. The full Fiji GUI/runtime test remains local because it requires a Fiji installation, Bio-Formats, the morphology plugin, and GUI-capable ImageJ execution.
+GitHub Actions runs the same integration harness on a pinned fresh Windows Fiji build whenever the production macro or runtime tests change. The workflow verifies the Fiji archive checksum, installs the pinned Morphology/BinaryConnectivity dependency, runs two square and two rectangular analyses, and validates the resulting CSV and TIFF outputs. The lightweight repository workflow also checks that `build_harnesses.py` can still transform the current production macro.
 
 ## Focused probes
 
