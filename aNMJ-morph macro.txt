@@ -187,9 +187,36 @@ function processOpenImage(fileName) {
 
   originalImageId = getImageID();
   sourceCopyTitle = "__aNMJ_source_" + originalImageId;
-  run("Duplicate...", "title=[" + sourceCopyTitle + "] duplicate");
-  sourceCopyId = getImageID();
-  selectImage(originalImageId);
+  sourceCopyIdText = "";
+  sourceCopyArguments = ";" + javaArgument + ";";
+  sourceCopyPrefix = ";source-copy-id=";
+  sourceCopyStart = indexOf(sourceCopyArguments, sourceCopyPrefix);
+  if (sourceCopyStart >= 0) {
+    sourceCopyStart = sourceCopyStart + lengthOf(sourceCopyPrefix);
+    sourceCopyTail = substring(sourceCopyArguments, sourceCopyStart);
+    sourceCopyEnd = indexOf(sourceCopyTail, ";");
+    if (sourceCopyEnd >= 0) {
+      sourceCopyIdText = substring(sourceCopyTail, 0, sourceCopyEnd);
+    }
+    if (sourceCopyIdText == "") {
+      exit("Error: Invalid source-copy-id supplied by Java");
+    }
+    suppliedSourceCopyId = parseInt(sourceCopyIdText);
+    if (isNaN(suppliedSourceCopyId) || sourceCopyIdText != "" + suppliedSourceCopyId || !isOpen(suppliedSourceCopyId)) {
+      exit("Error: Invalid source-copy-id supplied by Java");
+    }
+    selectImage(suppliedSourceCopyId);
+    if (getTitle() != sourceCopyTitle) {
+      selectImage(originalImageId);
+      exit("Error: Invalid source-copy-id supplied by Java");
+    }
+    sourceCopyId = suppliedSourceCopyId;
+    selectImage(originalImageId);
+  } else {
+    run("Duplicate...", "title=[" + sourceCopyTitle + "] duplicate");
+    sourceCopyId = getImageID();
+    selectImage(originalImageId);
+  }
 
   outputFilename = originalDirectory + "raw_data_table.csv";
 

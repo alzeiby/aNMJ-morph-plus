@@ -46,7 +46,7 @@ try {
     $previousErrorActionPreference = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        $output = & $java.FullName '-Djava.awt.headless=true' '-cp' $classpath 'JavaPluginSmoke' 2>&1
+        $output = & $java.FullName '-cp' $classpath 'JavaPluginSmoke' 2>&1
         $javaExitCode = $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $previousErrorActionPreference

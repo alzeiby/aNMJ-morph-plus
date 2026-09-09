@@ -47,7 +47,7 @@ jobs:
           python tests/runtime/validate_outputs.py --check-baseline
 
       - name: Build Java plugin bridge
-        run: mvn -B -ntp verify
+        run: xvfb-run -a mvn -B -ntp verify
 
       - name: Check whitespace errors
         run: git diff --check HEAD~1 HEAD

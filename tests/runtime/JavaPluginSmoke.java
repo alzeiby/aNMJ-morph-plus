@@ -1,4 +1,5 @@
 import ij.CompositeImage;
+import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
 import ij.WindowManager;
@@ -67,6 +68,12 @@ public final class JavaPluginSmoke {
             smokeStructuralNormalizer();
             smokeChannelRoleCanonicalizer();
             smokeBatchProjectionBridge();
+            require(IJ.getInstance() == null, "Java plugin smoke unexpectedly created an ImageJ UI instance");
+            final int[] remainingImageIds = WindowManager.getIDList();
+            require(
+                remainingImageIds == null || remainingImageIds.length == 0,
+                "Java plugin smoke left ImageJ images registered after cleanup"
+            );
             System.out.println("DONE java plugin smoke");
         }
     }
@@ -352,22 +359,31 @@ public final class JavaPluginSmoke {
             "buildMacroArgument",
             ImagePlus.class,
             channelChoiceClass,
-            boolean.class
+            boolean.class,
+            int.class
         );
         buildMacroArgument.setAccessible(true);
         final ImagePlus plainTwoChannel = twoPlane(7, 19);
         plainTwoChannel.setDimensions(2, 1, 1);
         require(!plainTwoChannel.isComposite(), "Plain two-channel smoke fixture unexpectedly composite");
-        final String plainArgument = (String) buildMacroArgument.invoke(null, plainTwoChannel, oneTwo, false);
+        final String plainArgument = (String) buildMacroArgument.invoke(null, plainTwoChannel, oneTwo, false, -12345);
         require(
             !plainArgument.contains("channels-canonical="),
             "Plain two-channel bridge unexpectedly skipped legacy Arrange"
         );
+        require(
+            plainArgument.contains("source-copy-id=-12345"),
+            "Plain two-channel bridge omitted source-copy ID"
+        );
         require(!interpreted.isComposite(), "C1/Z2 CHANNELS fixture unexpectedly composite");
-        final String twoPlaneArgument = (String) buildMacroArgument.invoke(null, interpreted, oneTwo, false);
+        final String twoPlaneArgument = (String) buildMacroArgument.invoke(null, interpreted, oneTwo, false, -23456);
         require(
             !twoPlaneArgument.contains("channels-canonical="),
             "C1/Z2 CHANNELS bridge unexpectedly skipped legacy Arrange"
+        );
+        require(
+            twoPlaneArgument.contains("source-copy-id=-23456"),
+            "C1/Z2 CHANNELS bridge omitted source-copy ID"
         );
     }
 
@@ -487,6 +503,7 @@ public final class JavaPluginSmoke {
         final List<ImagePlus> presentedImages = new ArrayList<>();
         final AtomicReference<ImagePlus> presented = new AtomicReference<>();
         final AtomicReference<String> macroArgument = new AtomicReference<>();
+        final AtomicReference<Integer> sourceCopyId = new AtomicReference<>();
         final Function<Path, ImagePlus> loader = ignored -> source;
         final Consumer<ImagePlus> presenter = image -> {
             presented.set(image);
@@ -499,6 +516,27 @@ public final class JavaPluginSmoke {
             require(
                 current != null && WindowManager.getImage(current.getID()) == current,
                 "Batch macro image ID does not resolve to the canonical image"
+            );
+            final String sourceCopyText = argumentValue(argument, "source-copy-id");
+            require(sourceCopyText != null, "Batch macro argument omitted source-copy ID");
+            final int copyId = Integer.parseInt(sourceCopyText);
+            sourceCopyId.set(copyId);
+            final ImagePlus sourceCopy = WindowManager.getImage(copyId);
+            require(sourceCopy != null, "Batch source-copy ID does not resolve while macro is running");
+            require(
+                ("__aNMJ_source_" + current.getID()).equals(sourceCopy.getTitle()),
+                "Batch source-copy title does not match canonical source ID"
+            );
+            require(sourceCopy.getID() != current.getID(), "Batch source copy reused canonical source ID");
+            require(
+                sourceCopy.getNChannels() == current.getNChannels() &&
+                    sourceCopy.getNSlices() == current.getNSlices() &&
+                    sourceCopy.getNFrames() == current.getNFrames(),
+                "Batch source-copy dimensions changed before macro handoff"
+            );
+            require(
+                sourceCopy.getStack().getProcessor(1).get(0, 0) == current.getStack().getProcessor(1).get(0, 0),
+                "Batch source-copy pixels differ before macro handoff"
             );
             return null;
         };
@@ -550,6 +588,10 @@ public final class JavaPluginSmoke {
             require(
                 macroArgument.get().contains("channels-canonical=1"),
                 "Batch macro did not receive canonical-channel shadow flag"
+            );
+            require(
+                sourceCopyId.get() != null && WindowManager.getImage(sourceCopyId.get()) == null,
+                "Batch source copy was not cleaned up after macro handoff"
             );
             require(!sentinelClosed.get(), "Batch cleanup closed a pre-existing sentinel image");
             final Path checkpoint = root.resolve(".anmj-morph-plus").resolve("session-v1.tsv");
@@ -604,6 +646,16 @@ public final class JavaPluginSmoke {
         if (!condition) {
             throw new IllegalStateException(message);
         }
+    }
+
+    private static String argumentValue(final String argument, final String key) {
+        final String prefix = key + "=";
+        for (String part : argument.split(";")) {
+            if (part.startsWith(prefix)) {
+                return part.substring(prefix.length());
+            }
+        }
+        return null;
     }
 
     private static Object enumConstant(final Class<?> enumClass, final String name) {

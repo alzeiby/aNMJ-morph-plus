@@ -37,6 +37,10 @@ public class ANMJMorphCommandTest {
         assertTrue(macro.contains(";channels-canonical=1;"));
         assertTrue(macro.contains("getJavaArgumentValue(\"two-plane\")"));
         assertTrue(macro.contains("selectImage(javaImageId);"));
+        assertTrue(macro.contains("sourceCopyPrefix = \";source-copy-id=\";"));
+        assertTrue(macro.contains("sourceCopyId = suppliedSourceCopyId;"));
+        assertTrue(macro.contains("exit(\"Error: Invalid source-copy-id supplied by Java\");"));
+        assertTrue(macro.contains("run(\"Duplicate...\", \"title=[\" + sourceCopyTitle + \"] duplicate\");"));
         assertTrue(macro.contains("2/7 Threshold Nerve terminal."));
         assertTrue(macro.contains("Screen 6/7 Check segmented image."));
         assertTrue(macro.contains("totalLengthOfBranches = (imageWidth * imageHeight - counts0) * pixelSizeX;"));

@@ -104,6 +104,11 @@ jobs:
           if (-not $jar) { throw 'Could not find built aNMJ-morph+ plugin JAR' }
           .\tests\runtime\run_java_plugin_smoke.ps1 -FijiRoot $env:FIJI_ROOT -PluginJar $jar.FullName
 
+      - name: Verify source-copy bridge fails closed
+        shell: powershell
+        run: |
+          .\tests\runtime\run_source_copy_failclosed_probes.ps1 -FijiRoot $env:FIJI_ROOT -TimeoutSeconds 60
+
       - name: Run fixture matrix and regression workflows
         shell: powershell
         run: |

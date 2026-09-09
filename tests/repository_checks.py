@@ -6,6 +6,8 @@ MACRO_PATH = ROOT / "aNMJ-morph macro.txt"
 MACRO = MACRO_PATH.read_text(encoding="utf-8")
 RUNTIME_VALIDATION_PATH = ROOT / "tests" / "runtime" / "run_validation.ps1"
 RUNTIME_VALIDATION = RUNTIME_VALIDATION_PATH.read_text(encoding="utf-8")
+FAILCLOSED_RUNNER_PATH = ROOT / "tests" / "runtime" / "run_source_copy_failclosed_probes.ps1"
+FAILCLOSED_BUILDER_PATH = ROOT / "tests" / "runtime" / "build_source_copy_failclosed_probes.py"
 
 
 def require(condition: bool, message: str) -> None:
@@ -90,6 +92,14 @@ def main() -> None:
         and "-PassThru -WindowStyle Hidden" in RUNTIME_VALIDATION,
         "Runtime validation must continue launching Fiji through the hidden wrapper",
     )
+    require(FAILCLOSED_RUNNER_PATH.exists(), "Source-copy fail-closed fresh-Fiji runner is missing")
+    require(FAILCLOSED_BUILDER_PATH.exists(), "Source-copy fail-closed probe builder is missing")
+    failclosed_runner = FAILCLOSED_RUNNER_PATH.read_text(encoding="utf-8")
+    require("-WindowStyle Hidden" in failclosed_runner, "Source-copy fail-closed probes must launch hidden")
+    require("'--headless'" in failclosed_runner, "Source-copy fail-closed probes must use Fiji headless mode")
+    require("FALLBACK DUPLICATE RAN" in failclosed_runner, "Source-copy fail-closed runner does not reject fallback execution")
+    require("UNEXPECTED RETURN" in failclosed_runner, "Source-copy fail-closed runner does not reject parser return")
+    require("Assert-NoPinnedFijiProcess" in failclosed_runner, "Source-copy fail-closed runner does not prove Fiji cleanup")
 
     # Rectangular-image calculation must use width * height, not the original square assumption.
     require(
@@ -180,6 +190,16 @@ def main() -> None:
     # Stateful ImageJ channel operations must target deterministic image IDs.
     require("originalImageId = getImageID();" in MACRO, "Original image ID is not captured before duplication")
     require("sourceCopyId = getImageID();" in MACRO, "Source-copy image ID is not captured")
+    require('sourceCopyPrefix = ";source-copy-id=";' in MACRO, "Java source-copy bridge is missing")
+    require("sourceCopyId = suppliedSourceCopyId;" in MACRO, "Supplied Java source-copy ID is not adopted")
+    require(
+        MACRO.count('exit("Error: Invalid source-copy-id supplied by Java");') >= 2,
+        "Invalid supplied source-copy IDs are not rejected fail-closed",
+    )
+    require(
+        MACRO.count('run("Duplicate...", "title=[" + sourceCopyTitle + "] duplicate");') == 1,
+        "Legacy initial source-copy Duplicate fallback changed",
+    )
     require("templateImageId = getImageID();" in MACRO, "Template image ID is not captured")
     require("segmentImageId = getImageID();" in MACRO, "Segmentation image ID is not captured")
     require(MACRO.count("selectImage(originalImageId);") >= 3, "Original analysis flow is not image-ID selected")
