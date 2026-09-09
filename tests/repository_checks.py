@@ -91,13 +91,18 @@ def main() -> None:
     require("cleaned_images" in MACRO, "Generated output directory is not excluded from recursive batch traversal")
 
     # Batch and CSV I/O should avoid unnecessary parsing and rewriting work.
-    require("hasSupportedImageExtension(lowerName)" in MACRO, "Batch extension checks are not using the normalized filename")
+    require("function hasSupportedImageExtension" not in MACRO, "ImageJ1 boolean extension helper must not be reintroduced")
     require("function openImageFile(fileName)" in MACRO, "Image opening is not centralized")
     require(
         'if (endsWith(lowerName, ".tif") || endsWith(lowerName, ".tiff"))' in MACRO,
         "TIFF batch inputs are not using the established native ImageJ open path",
     )
     require(MACRO.count('openImageFile(fileName);') >= 2, "Batch/single-image paths are not both routed through the common image opener")
+    for extension in (".lsm", ".nd2", ".czi", ".lif", ".png", ".jpg", ".jpeg", ".bmp"):
+        require(
+            f'endsWith(lowerName, "{extension}")' in MACRO,
+            f"Supported image extension is missing from inline ImageJ routing: {extension}",
+        )
     require('Dialog.addChoice("Analyze", newArray("Single image", "Batch folder"));' in MACRO, "Single-image file selection mode is missing")
     require('fileName = File.openDialog("Select image to analyze");' in MACRO, "Single-image file picker is missing")
     require('originalTitle = File.getName(getTitle());' in MACRO, "Bio-Formats titles are not normalized to a basename")
