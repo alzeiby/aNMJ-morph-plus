@@ -22,11 +22,11 @@ final class CsvOutputWriter {
         final String output = quote(pixels) + COLUMN +
             quote(metric) + COLUMN +
             result.inputTitle + COLUMN +
-            result.thresholdMethodNerveTerminal + "/" + result.thresholdMethodEndplate + COLUMN +
+            result.thresholdMethods + COLUMN +
             COLUMN +
             format(result.axonDiameter) + COLUMN +
-            format(result.nerveTerminalPerimeter) + COLUMN +
-            format(result.nerveTerminalArea) + COLUMN +
+            format(result.nerve.perimeter) + COLUMN +
+            format(result.nerve.area) + COLUMN +
             format(result.counts0) + COLUMN +
             format(result.counts2) + COLUMN +
             format(result.counts4) + COLUMN +
@@ -36,13 +36,13 @@ final class CsvOutputWriter {
             format(result.totalLengthOfBranches) + COLUMN +
             quote("=O" + rowNumber + "/J" + rowNumber) + COLUMN +
             quote("=LOG10(M" + rowNumber + "*N" + rowNumber + "*O" + rowNumber + ")") + COLUMN +
-            format(result.achrPerimeter) + COLUMN +
-            format(result.achrArea) + COLUMN +
-            format(result.endplateDiameter) + COLUMN +
-            format(result.endplatePerimeter) + COLUMN +
-            format(result.endplateArea) + COLUMN +
+            format(result.achr.perimeter) + COLUMN +
+            format(result.achr.area) + COLUMN +
+            format(result.endplate.feret) + COLUMN +
+            format(result.endplate.perimeter) + COLUMN +
+            format(result.endplate.area) + COLUMN +
             quote("=S" + rowNumber + "/V" + rowNumber + "*100") + COLUMN +
-            format(result.unoccupiedAchrArea) + COLUMN +
+            format(result.unoccupied.area) + COLUMN +
             quote("=S" + rowNumber + "-X" + rowNumber) + COLUMN +
             quote("=(S" + rowNumber + "-X" + rowNumber + ")/S" + rowNumber + "*100") + COLUMN +
             clusters + COLUMN +

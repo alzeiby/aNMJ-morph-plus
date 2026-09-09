@@ -26,16 +26,16 @@ final class InputWorkflowRunner implements Runnable {
     private final java.util.function.Consumer<String> errorReporter;
 
     InputWorkflowRunner() {
-        final ImageLoader loader = new ImageLoader();
-        final SingleImageAnalysisRunner single = new SingleImageAnalysisRunner();
-        this.currentImage = WindowManager::getCurrentImage;
-        this.modeSelector = InputWorkflowRunner::chooseMode;
-        this.fileSelector = InputWorkflowRunner::chooseFile;
-        this.imageLoader = loader::load;
-        this.imagePresenter = ImagePlus::show;
-        this.singleImageProcessor = single::analyze;
-        this.batchRunner = new BatchSessionRunner();
-        this.errorReporter = message -> IJ.error("aNMJ-morph+", message);
+        this(
+            WindowManager::getCurrentImage,
+            InputWorkflowRunner::chooseMode,
+            InputWorkflowRunner::chooseFile,
+            new ImageLoader()::load,
+            ImagePlus::show,
+            new SingleImageAnalysisRunner()::analyze,
+            new BatchSessionRunner(),
+            message -> IJ.error("aNMJ-morph+", message)
+        );
     }
 
     InputWorkflowRunner(
@@ -87,7 +87,7 @@ final class InputWorkflowRunner implements Runnable {
     }
 
     private void analyze(final ImagePlus image, final Path inputPath, final boolean presentImage) {
-        if (InputPolicy.normalizationFor(image) == InputNormalization.REJECT_TIME_SERIES) {
+        if (StructuralNormalizer.normalizationFor(image) == InputNormalization.REJECT_TIME_SERIES) {
             if (presentImage) {
                 image.close();
             }

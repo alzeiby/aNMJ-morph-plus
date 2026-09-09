@@ -123,7 +123,7 @@ public final class DirectJavaAnalysisRuntime {
         try {
             IJ.resetEscape();
             ImagePlus image = new ImageLoader().load(input);
-            final InputNormalization normalization = InputPolicy.normalizationFor(image);
+            final InputNormalization normalization = StructuralNormalizer.normalizationFor(image);
             if (normalization == InputNormalization.REJECT_TIME_SERIES) {
                 throw new IllegalStateException("Unexpected T>1 input in direct runtime fixture");
             }
@@ -161,9 +161,13 @@ public final class DirectJavaAnalysisRuntime {
             }
 
             final AnalysisWorkflow workflow = new AnalysisWorkflow(prompter);
-            final AnalysisRun run = workflow.analyze(image, input, analysisChoice, channelsCanonical);
-            new CsvOutputWriter().append(AnalysisOutputPaths.forInput(input).csv, run.result);
-            workflow.finish(run);
+            workflow.analyze(
+                image,
+                input,
+                analysisChoice,
+                channelsCanonical,
+                result -> new CsvOutputWriter().append(AnalysisOutputPaths.forInput(input).csv, result)
+            );
         } finally {
             closeImagesCreatedAfter(existing);
         }

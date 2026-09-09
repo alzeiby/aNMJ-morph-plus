@@ -41,7 +41,7 @@ final class BatchSessionRunner implements Runnable {
             BatchSessionRunner::chooseRoot,
             new BatchCheckpointStore(),
             new JavaBatchFileProcessor(),
-            BatchChoiceResolver.interactivePrompter(),
+            new BatchChoiceResolver.Prompter(),
             IJ::log
         );
     }
@@ -101,42 +101,33 @@ final class BatchSessionRunner implements Runnable {
     ) {
         final String relative = BatchCheckpointStore.relativePath(root, file);
         final BasicFileAttributes attributes = attributes(file);
+        final long size = attributes.size();
+        final long modifiedMillis = attributes.lastModifiedTime().toMillis();
         final AnalysisOutputPaths outputs = AnalysisOutputPaths.forInput(file);
         BatchCheckpointStore.FileRecord record = session.files.get(relative);
 
-        if (record != null && !record.matches(attributes.size(), attributes.lastModifiedTime().toMillis())) {
+        if (record != null && !record.matches(size, modifiedMillis)) {
             if (record.status == BatchCheckpointStore.Status.SUCCEEDED ||
                 record.status == BatchCheckpointStore.Status.NEEDS_REVIEW) {
-                record.size = attributes.size();
-                record.modifiedMillis = attributes.lastModifiedTime().toMillis();
-                mark(record, BatchCheckpointStore.Status.NEEDS_REVIEW, "INPUT_CHANGED",
+                record.size = size;
+                record.modifiedMillis = modifiedMillis;
+                persist(root, session, record, BatchCheckpointStore.Status.NEEDS_REVIEW, "INPUT_CHANGED",
                     "Input changed after a prior committed or ambiguous run");
-                checkpointStore.save(root, session);
                 return true;
             }
-            record = new BatchCheckpointStore.FileRecord(
-                relative,
-                attributes.size(),
-                attributes.lastModifiedTime().toMillis()
-            );
-            session.files.put(relative, record);
+            record = null;
         }
 
         if (record == null) {
-            record = new BatchCheckpointStore.FileRecord(
-                relative,
-                attributes.size(),
-                attributes.lastModifiedTime().toMillis()
-            );
+            record = new BatchCheckpointStore.FileRecord(relative, size, modifiedMillis);
             session.files.put(relative, record);
         }
 
         if (record.status == BatchCheckpointStore.Status.SUCCEEDED) {
             final long minimumCsvLines = record.csvLinesBefore == 0 ? 3 : record.csvLinesBefore + 1;
             if (existingCleanedOutputCount(outputs) != 3 || countCsvLines(outputs.csv) < minimumCsvLines) {
-                mark(record, BatchCheckpointStore.Status.NEEDS_REVIEW, "COMMITTED_OUTPUT_MISSING",
+                persist(root, session, record, BatchCheckpointStore.Status.NEEDS_REVIEW, "COMMITTED_OUTPUT_MISSING",
                     "A previously successful file no longer has its committed CSV/output artifacts");
-                checkpointStore.save(root, session);
             }
             return true;
         }
@@ -148,30 +139,27 @@ final class BatchSessionRunner implements Runnable {
         if (record.status == BatchCheckpointStore.Status.RUNNING) {
             final OutputState recovered = outputState(outputs, record.csvLinesBefore);
             if (recovered == OutputState.COMMITTED) {
-                mark(record, BatchCheckpointStore.Status.SUCCEEDED, "", "Recovered committed output after interruption");
-                checkpointStore.save(root, session);
+                persist(root, session, record, BatchCheckpointStore.Status.SUCCEEDED, "",
+                    "Recovered committed output after interruption");
                 return true;
             }
             if (recovered == OutputState.AMBIGUOUS) {
-                mark(record, BatchCheckpointStore.Status.NEEDS_REVIEW, "OUTPUT_STATE_AMBIGUOUS",
+                persist(root, session, record, BatchCheckpointStore.Status.NEEDS_REVIEW, "OUTPUT_STATE_AMBIGUOUS",
                     "Interrupted run left an ambiguous CSV/cleaned-output state");
-                checkpointStore.save(root, session);
                 return true;
             }
             record.status = BatchCheckpointStore.Status.PENDING;
         }
 
         if (collisions.contains(collisionKey(root, file))) {
-            mark(record, BatchCheckpointStore.Status.FAILED_PRECHECK, "OUTPUT_NAME_COLLISION",
+            persist(root, session, record, BatchCheckpointStore.Status.FAILED_PRECHECK, "OUTPUT_NAME_COLLISION",
                 "Another input in this directory produces the same cleaned-image filenames");
-            checkpointStore.save(root, session);
             return true;
         }
 
         if (existingCleanedOutputCount(outputs) > 0) {
-            mark(record, BatchCheckpointStore.Status.NEEDS_REVIEW, "PREEXISTING_OUTPUTS",
+            persist(root, session, record, BatchCheckpointStore.Status.NEEDS_REVIEW, "PREEXISTING_OUTPUTS",
                 "Cleaned outputs already exist without a successful checkpoint record");
-            checkpointStore.save(root, session);
             return true;
         }
 
@@ -195,19 +183,15 @@ final class BatchSessionRunner implements Runnable {
         } catch (BatchCheckpointStore.BatchCheckpointException e) {
             throw e;
         } catch (BatchFileException e) {
-            if (e.kind() == BatchFileException.Kind.CANCELLED) {
+            if (e.status == BatchCheckpointStore.Status.CANCELLED) {
                 stopSession = true;
             }
             final OutputState output = outputState(outputs, record.csvLinesBefore);
             if (output != OutputState.UNCHANGED) {
                 mark(record, BatchCheckpointStore.Status.NEEDS_REVIEW, "OUTPUT_STATE_AMBIGUOUS",
                     "Workflow failed after changing CSV or cleaned outputs: " + e.getMessage());
-            } else if (e.kind() == BatchFileException.Kind.PRECHECK) {
-                mark(record, BatchCheckpointStore.Status.FAILED_PRECHECK, e.reasonCode(), e.getMessage());
-            } else if (e.kind() == BatchFileException.Kind.CANCELLED) {
-                mark(record, BatchCheckpointStore.Status.CANCELLED, e.reasonCode(), e.getMessage());
             } else {
-                mark(record, BatchCheckpointStore.Status.FAILED_RUNTIME, e.reasonCode(), e.getMessage());
+                mark(record, e.status, e.reasonCode, e.getMessage());
             }
         } catch (RuntimeException e) {
             final OutputState output = outputState(outputs, record.csvLinesBefore);
@@ -256,15 +240,12 @@ final class BatchSessionRunner implements Runnable {
     }
 
     private static Set<String> outputStemCollisions(final Path root, final List<Path> files) {
-        final Map<String, Integer> counts = new HashMap<>();
+        final Set<String> seen = new HashSet<>();
+        final Set<String> collisions = new HashSet<>();
         for (Path file : files) {
             final String key = collisionKey(root, file);
-            counts.put(key, counts.getOrDefault(key, 0) + 1);
-        }
-        final Set<String> collisions = new HashSet<>();
-        for (Map.Entry<String, Integer> entry : counts.entrySet()) {
-            if (entry.getValue() > 1) {
-                collisions.add(entry.getKey());
+            if (!seen.add(key)) {
+                collisions.add(key);
             }
         }
         return collisions;
@@ -324,7 +305,7 @@ final class BatchSessionRunner implements Runnable {
 
     private static int existingCleanedOutputCount(final AnalysisOutputPaths outputs) {
         int count = 0;
-        for (Path output : outputs.cleanedOutputs()) {
+        for (Path output : new Path[] {outputs.axon, outputs.endplate, outputs.endplateIntermediate}) {
             try {
                 if (Files.isRegularFile(output) && Files.size(output) > 0) {
                     count++;
@@ -353,10 +334,22 @@ final class BatchSessionRunner implements Runnable {
         record.reason = reason == null ? "" : reason;
     }
 
+    private void persist(
+        final Path root,
+        final BatchCheckpointStore.Session session,
+        final BatchCheckpointStore.FileRecord record,
+        final BatchCheckpointStore.Status status,
+        final String reasonCode,
+        final String reason
+    ) {
+        mark(record, status, reasonCode, reason);
+        checkpointStore.save(root, session);
+    }
+
     private void reportSummary(final BatchCheckpointStore.Session session) {
         final Map<BatchCheckpointStore.Status, Integer> counts = new HashMap<>();
         for (BatchCheckpointStore.FileRecord record : session.files.values()) {
-            counts.put(record.status, counts.getOrDefault(record.status, 0) + 1);
+            counts.merge(record.status, 1, Integer::sum);
         }
         statusReporter.accept(
             "aNMJ-morph+ batch: " + counts.getOrDefault(BatchCheckpointStore.Status.SUCCEEDED, 0) + " succeeded, " +

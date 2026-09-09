@@ -15,7 +15,7 @@ final class SingleImageAnalysisRunner {
 
     void analyze(ImagePlus image, final Path selectedPath) {
         final Path inputPath = selectedPath == null ? pathForCurrentImage(image) : selectedPath;
-        final InputNormalization normalization = InputPolicy.normalizationFor(image);
+        final InputNormalization normalization = StructuralNormalizer.normalizationFor(image);
         if (normalization == InputNormalization.REJECT_TIME_SERIES) {
             throw new IllegalArgumentException(InputWorkflowRunner.TIME_SERIES_ERROR);
         }
@@ -23,13 +23,7 @@ final class SingleImageAnalysisRunner {
         final TwoPlaneInterpretation twoPlane = normalization == InputNormalization.CHOOSE_TWO_PLANE_INTERPRETATION
             ? chooseTwoPlane()
             : null;
-        final ImagePlus normalized = structuralNormalizer.normalize(image, twoPlane);
-        if (normalized != image) {
-            image.changes = false;
-            image.close();
-            image = normalized;
-            image.show();
-        }
+        image = normalizeAndPresent(image, twoPlane, false);
 
         if (image.getNChannels() < 2) {
             throw new IllegalArgumentException(
@@ -37,22 +31,67 @@ final class SingleImageAnalysisRunner {
             );
         }
 
-        final BatchChoiceResolver.ChannelChoice selected = chooseChannels(image.getNChannels());
+        analyzeSelected(image, inputPath, chooseChannels(image.getNChannels()));
+    }
+
+    ImagePlus normalizeAndPresent(
+        ImagePlus image,
+        final TwoPlaneInterpretation twoPlane,
+        final boolean alwaysShow
+    ) {
+        final ImagePlus normalized = structuralNormalizer.normalize(image, twoPlane);
+        final boolean replaced = normalized != image;
+        if (replaced) {
+            image.changes = false;
+            image.close();
+            image = normalized;
+        }
+        if (replaced || alwaysShow) {
+            image.show();
+        }
+        return image;
+    }
+
+    void analyzeSelected(
+        ImagePlus image,
+        final Path inputPath,
+        final BatchChoiceResolver.ChannelChoice selected
+    ) {
         BatchChoiceResolver.ChannelChoice analysisChoice = selected;
         boolean channelsCanonical = false;
         if (image.getNChannels() <= ChannelRoleCanonicalizer.IMAGEJ_ARRANGER_MAX_CHANNELS) {
-            final ImagePlus canonical = channelRoleCanonicalizer.canonicalize(image, selected);
-            if (canonical != image) {
-                image = canonical;
-                image.show();
-            }
+            image = canonicalizeSelected(image, selected);
             analysisChoice = new BatchChoiceResolver.ChannelChoice(1, 2);
             channelsCanonical = image.getNChannels() == 2 && image.isComposite();
         }
 
-        final AnalysisRun run = analysisWorkflow.analyze(image, inputPath, analysisChoice, channelsCanonical);
-        outputWriter.append(AnalysisOutputPaths.forInput(inputPath).csv, run.result);
-        analysisWorkflow.finish(run);
+        analyzeCanonical(image, inputPath, analysisChoice, channelsCanonical);
+    }
+
+    ImagePlus canonicalizeSelected(
+        final ImagePlus image,
+        final BatchChoiceResolver.ChannelChoice selected
+    ) {
+        final ImagePlus canonical = channelRoleCanonicalizer.canonicalize(image, selected);
+        if (canonical != image) {
+            canonical.show();
+        }
+        return canonical;
+    }
+
+    void analyzeCanonical(
+        final ImagePlus image,
+        final Path inputPath,
+        final BatchChoiceResolver.ChannelChoice analysisChoice,
+        final boolean channelsCanonical
+    ) {
+        analysisWorkflow.analyze(
+            image,
+            inputPath,
+            analysisChoice,
+            channelsCanonical,
+            result -> outputWriter.append(AnalysisOutputPaths.forInput(inputPath).csv, result)
+        );
     }
 
     private static TwoPlaneInterpretation chooseTwoPlane() {

@@ -29,9 +29,14 @@ final class BatchChoiceResolver {
         }
     }
 
-    interface Prompter {
-        PromptResult<TwoPlaneInterpretation> promptTwoPlane(String signature);
-        PromptResult<ChannelChoice> promptChannels(String signature, int channelCount);
+    static class Prompter {
+        PromptResult<TwoPlaneInterpretation> promptTwoPlane() {
+            return BatchChoiceResolver.promptTwoPlane(true);
+        }
+
+        PromptResult<ChannelChoice> promptChannels(final int channelCount) {
+            return BatchChoiceResolver.promptChannels(channelCount, true);
+        }
     }
 
     private final Path root;
@@ -61,7 +66,7 @@ final class BatchChoiceResolver {
                 throw new BatchCheckpointStore.BatchCheckpointException("Malformed remembered two-plane choice", e);
             }
         }
-        final PromptResult<TwoPlaneInterpretation> result = prompter.promptTwoPlane(signature);
+        final PromptResult<TwoPlaneInterpretation> result = prompter.promptTwoPlane();
         if (result == null || result.value == null) {
             throw BatchFileException.cancelled("Two-plane interpretation was cancelled");
         }
@@ -89,7 +94,7 @@ final class BatchChoiceResolver {
                 throw new BatchCheckpointStore.BatchCheckpointException("Malformed remembered channel choice", e);
             }
         }
-        final PromptResult<ChannelChoice> result = prompter.promptChannels(signature, channelCount);
+        final PromptResult<ChannelChoice> result = prompter.promptChannels(channelCount);
         if (result == null || result.value == null) {
             throw BatchFileException.cancelled("Channel selection was cancelled");
         }
@@ -114,20 +119,6 @@ final class BatchChoiceResolver {
             );
         }
         return choice;
-    }
-
-    static Prompter interactivePrompter() {
-        return new Prompter() {
-            @Override
-            public PromptResult<TwoPlaneInterpretation> promptTwoPlane(final String signature) {
-                return BatchChoiceResolver.promptTwoPlane(true);
-            }
-
-            @Override
-            public PromptResult<ChannelChoice> promptChannels(final String signature, final int channelCount) {
-                return BatchChoiceResolver.promptChannels(channelCount, true);
-            }
-        };
     }
 
     static PromptResult<TwoPlaneInterpretation> promptTwoPlane(final boolean allowRemember) {
