@@ -43,8 +43,15 @@ try {
         throw 'Could not compile Java plugin smoke against the pinned Fiji runtime.'
     }
 
-    $output = & $java.FullName '-Djava.awt.headless=true' '-cp' $classpath 'JavaPluginSmoke' 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $output = & $java.FullName '-Djava.awt.headless=true' '-cp' $classpath 'JavaPluginSmoke' 2>&1
+        $javaExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($javaExitCode -ne 0) {
         throw "Java plugin smoke failed:`n$($output -join "`n")"
     }
     if (($output -join "`n") -notlike '*DONE java plugin smoke*') {
