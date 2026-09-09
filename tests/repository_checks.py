@@ -69,8 +69,9 @@ def main() -> None:
     # fiji.bat is only a launcher wrapper; its exit must not end trace polling
     # before the Fiji child has reached the requested completion marker.
     require(
-        "$process.Refresh()\n        if ($process.HasExited) { break }" not in RUNTIME_VALIDATION,
-        "Runtime validation must not stop polling when the Fiji launcher wrapper exits",
+        RUNTIME_VALIDATION.count("$process.HasExited") == 1
+        and "if (-not $process.HasExited)" in RUNTIME_VALIDATION,
+        "Runtime validation must use wrapper HasExited only for post-poll cleanup, never to stop completion polling",
     )
     require(
         "while ((Get-Date) -lt $deadline)" in RUNTIME_VALIDATION
