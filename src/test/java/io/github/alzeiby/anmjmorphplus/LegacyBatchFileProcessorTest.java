@@ -75,6 +75,7 @@ public class LegacyBatchFileProcessorTest {
         assertTrue(argument.get().contains("channels-canonical=1"));
         assertTrue(argument.get().contains("source-copy-id="));
         assertTrue(argument.get().contains("template-copy-id="));
+        assertTrue(argument.get().contains("early-split-java=1"));
         assertFalse(argument.get().contains("two-plane="));
     }
 
@@ -186,6 +187,7 @@ public class LegacyBatchFileProcessorTest {
         assertTrue(argument.get().contains("muscle-channel=1"));
         assertTrue(argument.get().contains("nerve-channel=2"));
         assertFalse(argument.get().contains("channels-canonical="));
+        assertTrue(argument.get().contains("early-split-java=1"));
     }
 
     @Test
@@ -333,6 +335,7 @@ public class LegacyBatchFileProcessorTest {
         assertTrue(argument.get().contains("nerve-channel=2"));
         assertFalse(image.isComposite());
         assertFalse(argument.get().contains("channels-canonical="));
+        assertTrue(argument.get().contains("early-split-java=1"));
     }
 
     @Test
@@ -589,6 +592,7 @@ public class LegacyBatchFileProcessorTest {
         assertTrue(argument.get().contains("muscle-channel=3"));
         assertTrue(argument.get().contains("nerve-channel=1"));
         assertFalse(argument.get().contains("channels-canonical="));
+        assertFalse(argument.get().contains("early-split-java="));
     }
 
     @Test

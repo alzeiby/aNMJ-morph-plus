@@ -157,7 +157,8 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
                 macroChannelChoice,
                 channelsCanonical,
                 sourceCopy.getID(),
-                templateCopy.getID()
+                templateCopy.getID(),
+                effectiveChannels <= ChannelRoleCanonicalizer.IMAGEJ_ARRANGER_MAX_CHANNELS
             );
             final String result;
             try {
@@ -178,7 +179,8 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
         final BatchChoiceResolver.ChannelChoice channelChoice,
         final boolean channelsCanonical,
         final int sourceCopyId,
-        final int templateCopyId
+        final int templateCopyId,
+        final boolean earlyJavaSplit
     ) {
         final StringBuilder argument = new StringBuilder()
             .append("image-id=").append(image.getID())
@@ -186,6 +188,9 @@ final class LegacyBatchFileProcessor implements BatchSessionRunner.FileProcessor
             .append(";nerve-channel=").append(channelChoice.nerveTerminalChannel())
             .append(";source-copy-id=").append(sourceCopyId)
             .append(";template-copy-id=").append(templateCopyId);
+        if (earlyJavaSplit) {
+            argument.append(";early-split-java=1");
+        }
         if (channelsCanonical) {
             argument.append(";channels-canonical=1");
         }

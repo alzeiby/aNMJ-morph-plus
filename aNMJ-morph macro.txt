@@ -240,6 +240,7 @@ function processOpenImage(fileName) {
   suppliedMuscleChannel = getJavaArgumentValue("muscle-channel");
   suppliedNerveChannel = getJavaArgumentValue("nerve-channel");
   channelsCanonical = indexOf(";" + javaArgument + ";", ";channels-canonical=1;") >= 0;
+  earlySplitJava = indexOf(";" + javaArgument + ";", ";early-split-java=1;") >= 0;
   if (suppliedMuscleChannel != "" && suppliedNerveChannel != "") {
     muscleEndplateChannel = parseInt(suppliedMuscleChannel);
     nerveTerminalChannel = parseInt(suppliedNerveChannel);
@@ -285,9 +286,36 @@ function processOpenImage(fileName) {
   if (!channelsCanonical) {
     run("Arrange Channels...", "new=" + muscleEndplateChannel + '' + nerveTerminalChannel);
   }
-  selectImage(originalImageId);
-  Stack.setChannel(1);
-  run("Split Channels");
+  if (earlySplitJava) {
+    Stack.setChannel(1);
+    splitStatus = call("io.github.alzeiby.anmjmorphplus.EarlySplitChannelsBridge.splitCurrent");
+    splitParts = split(splitStatus, ";");
+    if (splitParts.length != 3 || splitParts[0] != "OK") {
+      exit("Error: Java early Split Channels failed: " + splitStatus);
+    }
+    originalSplitC1Text = splitParts[1];
+    originalSplitC2Text = splitParts[2];
+    originalSplitC1Id = parseInt(originalSplitC1Text);
+    originalSplitC2Id = parseInt(originalSplitC2Text);
+    if (isNaN(originalSplitC1Id) || isNaN(originalSplitC2Id) ||
+        originalSplitC1Text != "" + originalSplitC1Id || originalSplitC2Text != "" + originalSplitC2Id ||
+        originalSplitC1Id == 0 || originalSplitC2Id == 0 || originalSplitC1Id == originalSplitC2Id ||
+        !isOpen(originalSplitC1Id) || !isOpen(originalSplitC2Id)) {
+      exit("Error: Java early Split Channels returned invalid image IDs");
+    }
+    selectImage(originalSplitC1Id);
+    if (getTitle() != "C1-" + originalTitle) {
+      exit("Error: Java early Split Channels returned invalid C1 image");
+    }
+    selectImage(originalSplitC2Id);
+    if (getTitle() != "C2-" + originalTitle) {
+      exit("Error: Java early Split Channels returned invalid C2 image");
+    }
+  } else {
+    selectImage(originalImageId);
+    Stack.setChannel(1);
+    run("Split Channels");
+  }
   run("Threshold...");
 
   selectImage(sourceCopyId);
@@ -324,9 +352,36 @@ function processOpenImage(fileName) {
   if (!channelsCanonical) {
     run("Arrange Channels...", "new=" + muscleEndplateChannel + '' + nerveTerminalChannel);
   }
-  selectImage(templateImageId);
-  Stack.setChannel(1);
-  run("Split Channels");
+  if (earlySplitJava) {
+    Stack.setChannel(1);
+    splitStatus = call("io.github.alzeiby.anmjmorphplus.EarlySplitChannelsBridge.splitCurrent");
+    splitParts = split(splitStatus, ";");
+    if (splitParts.length != 3 || splitParts[0] != "OK") {
+      exit("Error: Java early Split Channels failed: " + splitStatus);
+    }
+    templateSplitC1Text = splitParts[1];
+    templateSplitC2Text = splitParts[2];
+    templateSplitC1Id = parseInt(templateSplitC1Text);
+    templateSplitC2Id = parseInt(templateSplitC2Text);
+    if (isNaN(templateSplitC1Id) || isNaN(templateSplitC2Id) ||
+        templateSplitC1Text != "" + templateSplitC1Id || templateSplitC2Text != "" + templateSplitC2Id ||
+        templateSplitC1Id == 0 || templateSplitC2Id == 0 || templateSplitC1Id == templateSplitC2Id ||
+        !isOpen(templateSplitC1Id) || !isOpen(templateSplitC2Id)) {
+      exit("Error: Java early Split Channels returned invalid image IDs");
+    }
+    selectImage(templateSplitC1Id);
+    if (getTitle() != "C1-" + templateTitle) {
+      exit("Error: Java early Split Channels returned invalid C1 image");
+    }
+    selectImage(templateSplitC2Id);
+    if (getTitle() != "C2-" + templateTitle) {
+      exit("Error: Java early Split Channels returned invalid C2 image");
+    }
+  } else {
+    selectImage(templateImageId);
+    Stack.setChannel(1);
+    run("Split Channels");
+  }
   templateFileName = templateTitle;
 
   setTool(19);

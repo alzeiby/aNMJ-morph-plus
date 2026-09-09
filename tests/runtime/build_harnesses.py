@@ -86,7 +86,7 @@ run("Quit");
 File.saveString("START\\n", testLog);
     openImageFile(testFile);
 File.append("STAGE 1 open image", testLog);
-javaArgument = "image-id=" + getImageID() + ";muscle-channel=1;nerve-channel=2;channels-canonical=1";
+    javaArgument = "image-id=" + getImageID() + ";muscle-channel=1;nerve-channel=2;channels-canonical=1;early-split-java=1";
 File.append("STAGE 1 Java channels supplied", testLog);
 processOpenImage(testFile);
 File.append("DONE stage 7", testLog);
@@ -122,7 +122,7 @@ run("Quit");
   javaSuppliedSourceCopyId = getImageID();
   selectImage(originalImageId);
   javaArgument = javaArgument + ";source-copy-id=" + javaSuppliedSourceCopyId;
-  if (indexOf(javaArgument, ";muscle-channel=1;nerve-channel=2;channels-canonical=1;source-copy-id=") < 0) {
+  if (indexOf(javaArgument, ";muscle-channel=1;nerve-channel=2;channels-canonical=1;early-split-java=1;source-copy-id=") < 0) {
     exit("Error: Java bridge argument scope lost before source-copy handoff");
   }
   File.append("STAGE 1 Java source copy argument preserved", testLog);
@@ -183,6 +183,88 @@ run("Quit");
   if (!channelsCanonical) {''',
             1,
         )
+        split_call = '    splitStatus = call("io.github.alzeiby.anmjmorphplus.EarlySplitChannelsBridge.splitCurrent");'
+        if text.count(split_call) != 2:
+            raise RuntimeError("Production macro early Java Split Channels boundaries changed")
+        split_block = '''  if (earlySplitJava) {
+    Stack.setChannel(1);
+    splitStatus = call("io.github.alzeiby.anmjmorphplus.EarlySplitChannelsBridge.splitCurrent");'''
+        if text.count(split_block) != 2:
+            raise RuntimeError("Production macro early Java Split Channels call shape changed")
+        text = text.replace(
+            split_block,
+            '''  if (earlySplitJava) {
+    Stack.setChannel(1);
+    File.append("STAGE 2 before Java original split", testLog);
+    splitStatus = call("io.github.alzeiby.anmjmorphplus.EarlySplitChannelsBridge.splitCurrent");
+    File.append("STAGE 2 after Java original split status=" + splitStatus, testLog);''',
+            1,
+        )
+        text = text.replace(
+            split_block,
+            '''  if (earlySplitJava) {
+    Stack.setChannel(1);
+    File.append("STAGE 2 before Java template split", testLog);
+    splitStatus = call("io.github.alzeiby.anmjmorphplus.EarlySplitChannelsBridge.splitCurrent");
+    File.append("STAGE 2 after Java template split status=" + splitStatus, testLog);''',
+            1,
+        )
+        original_id_adoption = '''    selectImage(originalSplitC2Id);
+    if (getTitle() != "C2-" + originalTitle) {
+      exit("Error: Java early Split Channels returned invalid C2 image");
+    }'''
+        if text.count(original_id_adoption) != 1:
+            raise RuntimeError("Production macro original split ID adoption boundary changed")
+        text = text.replace(
+            original_id_adoption,
+            original_id_adoption + '''
+    if (originalSplitC1Id == 0 || originalSplitC2Id == 0 || getImageID() != originalSplitC2Id || !isOpen(sourceCopyId)) {
+      exit("Error: Java original split IDs were not adopted");
+    }
+    File.append("STAGE 2 Java original split accepted C2 current sourceCopy intact", testLog);
+    File.append("STAGE 2 Java original split IDs adopted C1=" + originalSplitC1Id + " C2=" + originalSplitC2Id, testLog);''',
+            1,
+        )
+        template_id_adoption = '''    selectImage(templateSplitC2Id);
+    if (getTitle() != "C2-" + templateTitle) {
+      exit("Error: Java early Split Channels returned invalid C2 image");
+    }'''
+        if text.count(template_id_adoption) != 1:
+            raise RuntimeError("Production macro template split ID adoption boundary changed")
+        text = text.replace(
+            template_id_adoption,
+            template_id_adoption + '''
+    if (templateSplitC1Id == 0 || templateSplitC2Id == 0 || getImageID() != templateSplitC2Id || !isOpen(sourceCopyId)) {
+      exit("Error: Java template split IDs were not adopted");
+    }
+    File.append("STAGE 2 Java template split accepted C2 current sourceCopy intact", testLog);
+    File.append("STAGE 2 Java template split IDs adopted C1=" + templateSplitC1Id + " C2=" + templateSplitC2Id, testLog);''',
+            1,
+        )
+        original_fallback = '''    selectImage(originalImageId);
+    Stack.setChannel(1);
+    run("Split Channels");'''
+        if text.count(original_fallback) != 1:
+            raise RuntimeError("Production macro original early Split Channels fallback changed")
+        text = text.replace(
+            original_fallback,
+            '''    File.append("ERROR Java original split entered legacy fallback", testLog);
+    exit("Error: Java original split entered legacy fallback");
+''' + original_fallback,
+            1,
+        )
+        template_fallback_split = '''    selectImage(templateImageId);
+    Stack.setChannel(1);
+    run("Split Channels");'''
+        if text.count(template_fallback_split) != 1:
+            raise RuntimeError("Production macro template early Split Channels fallback changed")
+        text = text.replace(
+            template_fallback_split,
+            '''    File.append("ERROR Java template split entered legacy fallback", testLog);
+    exit("Error: Java template split entered legacy fallback");
+''' + template_fallback_split,
+            1,
+        )
 
     if 'suppliedMuscleChannel = getJavaArgumentValue("muscle-channel");' in text:
         welcome_pattern = re.compile(
@@ -210,6 +292,7 @@ run("Quit");
             '''  muscleEndplateChannel = 1;
   nerveTerminalChannel = 2;
   channelsCanonical = false;
+  earlySplitJava = false;
   File.append("STAGE 1 channels selected", testLog);
 ''',
             "Welcome/channel-selection dialog",
@@ -301,6 +384,7 @@ def check(macro: Path) -> None:
         required = [
             "STAGE 1 channels selected",
             "channelsCanonical = false;",
+            "earlySplitJava = false;",
             'setAutoThreshold("Default dark")',
             "STAGE 6 segmentation accepted",
             "DONE stage 7",
@@ -317,10 +401,10 @@ def check(macro: Path) -> None:
     )
     for marker in (
         "var javaArgument = getArgument();",
-        'javaArgument = "image-id=" + getImageID() + ";muscle-channel=1;nerve-channel=2;channels-canonical=1";',
+        'javaArgument = "image-id=" + getImageID() + ";muscle-channel=1;nerve-channel=2;channels-canonical=1;early-split-java=1";',
         "STAGE 1 Java channels supplied",
         'javaArgument = javaArgument + ";source-copy-id=" + javaSuppliedSourceCopyId;',
-        'if (indexOf(javaArgument, ";muscle-channel=1;nerve-channel=2;channels-canonical=1;source-copy-id=") < 0) {',
+        'if (indexOf(javaArgument, ";muscle-channel=1;nerve-channel=2;channels-canonical=1;early-split-java=1;source-copy-id=") < 0) {',
         "STAGE 1 Java source copy argument preserved",
         "STAGE 1 Java source copy supplied",
         "STAGE 1 Java source copy accepted",
@@ -329,6 +413,16 @@ def check(macro: Path) -> None:
         "STAGE 2 Java template copy supplied",
         "STAGE 2 Java template copy accepted",
         "ERROR Java template bridge entered legacy fallback",
+        "STAGE 2 before Java original split",
+        "STAGE 2 after Java original split status=",
+        "STAGE 2 before Java template split",
+        "STAGE 2 after Java template split status=",
+        "STAGE 2 Java original split accepted C2 current sourceCopy intact",
+        "STAGE 2 Java template split accepted C2 current sourceCopy intact",
+        "STAGE 2 Java original split IDs adopted C1=",
+        "STAGE 2 Java template split IDs adopted C1=",
+        "ERROR Java original split entered legacy fallback",
+        "ERROR Java template split entered legacy fallback",
         'suppliedMuscleChannel = getJavaArgumentValue("muscle-channel");',
         'setAutoThreshold("Default dark")',
         "STAGE 6 segmentation accepted",
