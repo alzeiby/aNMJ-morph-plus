@@ -123,8 +123,7 @@ public final class DirectJavaAnalysisRuntime {
         try {
             IJ.resetEscape();
             ImagePlus image = new ImageLoader().load(input);
-            final ImageShape shape = ImageShape.from(image);
-            final InputNormalization normalization = InputPolicy.normalizationFor(shape);
+            final InputNormalization normalization = InputPolicy.normalizationFor(image);
             if (normalization == InputNormalization.REJECT_TIME_SERIES) {
                 throw new IllegalStateException("Unexpected T>1 input in direct runtime fixture");
             }

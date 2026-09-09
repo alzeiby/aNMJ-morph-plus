@@ -17,15 +17,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-final class BatchSessionRunner implements WorkflowRunner {
-
-    interface FileProcessor {
-        void process(Path path, BatchChoiceResolver choices);
-    }
+final class BatchSessionRunner implements Runnable {
 
     private enum OutputState {
         COMMITTED,
@@ -35,7 +32,7 @@ final class BatchSessionRunner implements WorkflowRunner {
 
     private final Supplier<Path> rootSelector;
     private final BatchCheckpointStore checkpointStore;
-    private final FileProcessor fileProcessor;
+    private final BiConsumer<Path, BatchChoiceResolver> fileProcessor;
     private final BatchChoiceResolver.Prompter choicePrompter;
     private final Consumer<String> statusReporter;
 
@@ -52,7 +49,7 @@ final class BatchSessionRunner implements WorkflowRunner {
     BatchSessionRunner(
         final Supplier<Path> rootSelector,
         final BatchCheckpointStore checkpointStore,
-        final FileProcessor fileProcessor,
+        final BiConsumer<Path, BatchChoiceResolver> fileProcessor,
         final BatchChoiceResolver.Prompter choicePrompter,
         final Consumer<String> statusReporter
     ) {
@@ -104,6 +101,7 @@ final class BatchSessionRunner implements WorkflowRunner {
     ) {
         final String relative = BatchCheckpointStore.relativePath(root, file);
         final BasicFileAttributes attributes = attributes(file);
+        final AnalysisOutputPaths outputs = AnalysisOutputPaths.forInput(file);
         BatchCheckpointStore.FileRecord record = session.files.get(relative);
 
         if (record != null && !record.matches(attributes.size(), attributes.lastModifiedTime().toMillis())) {
@@ -135,7 +133,7 @@ final class BatchSessionRunner implements WorkflowRunner {
 
         if (record.status == BatchCheckpointStore.Status.SUCCEEDED) {
             final long minimumCsvLines = record.csvLinesBefore == 0 ? 3 : record.csvLinesBefore + 1;
-            if (existingCleanedOutputCount(file) != 3 || countCsvLines(csvPath(file)) < minimumCsvLines) {
+            if (existingCleanedOutputCount(outputs) != 3 || countCsvLines(outputs.csv) < minimumCsvLines) {
                 mark(record, BatchCheckpointStore.Status.NEEDS_REVIEW, "COMMITTED_OUTPUT_MISSING",
                     "A previously successful file no longer has its committed CSV/output artifacts");
                 checkpointStore.save(root, session);
@@ -148,7 +146,7 @@ final class BatchSessionRunner implements WorkflowRunner {
         }
 
         if (record.status == BatchCheckpointStore.Status.RUNNING) {
-            final OutputState recovered = outputState(file, record.csvLinesBefore);
+            final OutputState recovered = outputState(outputs, record.csvLinesBefore);
             if (recovered == OutputState.COMMITTED) {
                 mark(record, BatchCheckpointStore.Status.SUCCEEDED, "", "Recovered committed output after interruption");
                 checkpointStore.save(root, session);
@@ -170,21 +168,21 @@ final class BatchSessionRunner implements WorkflowRunner {
             return true;
         }
 
-        if (hasAnyCleanedOutput(file)) {
+        if (existingCleanedOutputCount(outputs) > 0) {
             mark(record, BatchCheckpointStore.Status.NEEDS_REVIEW, "PREEXISTING_OUTPUTS",
                 "Cleaned outputs already exist without a successful checkpoint record");
             checkpointStore.save(root, session);
             return true;
         }
 
-        record.csvLinesBefore = countCsvLines(csvPath(file));
+        record.csvLinesBefore = countCsvLines(outputs.csv);
         mark(record, BatchCheckpointStore.Status.RUNNING, "", "");
         checkpointStore.save(root, session);
 
         boolean stopSession = false;
         try {
-            fileProcessor.process(file, choices);
-            final OutputState output = outputState(file, record.csvLinesBefore);
+            fileProcessor.accept(file, choices);
+            final OutputState output = outputState(outputs, record.csvLinesBefore);
             if (output == OutputState.COMMITTED) {
                 mark(record, BatchCheckpointStore.Status.SUCCEEDED, "", "");
             } else if (output == OutputState.UNCHANGED) {
@@ -200,7 +198,7 @@ final class BatchSessionRunner implements WorkflowRunner {
             if (e.kind() == BatchFileException.Kind.CANCELLED) {
                 stopSession = true;
             }
-            final OutputState output = outputState(file, record.csvLinesBefore);
+            final OutputState output = outputState(outputs, record.csvLinesBefore);
             if (output != OutputState.UNCHANGED) {
                 mark(record, BatchCheckpointStore.Status.NEEDS_REVIEW, "OUTPUT_STATE_AMBIGUOUS",
                     "Workflow failed after changing CSV or cleaned outputs: " + e.getMessage());
@@ -212,12 +210,13 @@ final class BatchSessionRunner implements WorkflowRunner {
                 mark(record, BatchCheckpointStore.Status.FAILED_RUNTIME, e.reasonCode(), e.getMessage());
             }
         } catch (RuntimeException e) {
-            final OutputState output = outputState(file, record.csvLinesBefore);
+            final OutputState output = outputState(outputs, record.csvLinesBefore);
             if (output != OutputState.UNCHANGED) {
                 mark(record, BatchCheckpointStore.Status.NEEDS_REVIEW, "OUTPUT_STATE_AMBIGUOUS",
-                    "Unexpected failure after output changed: " + messageOrClass(e));
+                    "Unexpected failure after output changed: " + Objects.toString(e.getMessage(), e.getClass().getSimpleName()));
             } else {
-                mark(record, BatchCheckpointStore.Status.FAILED_RUNTIME, "MACRO_ERROR", messageOrClass(e));
+                mark(record, BatchCheckpointStore.Status.FAILED_RUNTIME, "MACRO_ERROR",
+                    Objects.toString(e.getMessage(), e.getClass().getSimpleName()));
             }
         }
         checkpointStore.save(root, session);
@@ -273,7 +272,8 @@ final class BatchSessionRunner implements WorkflowRunner {
 
     private static String collisionKey(final Path root, final Path file) {
         final Path parent = file.getParent() == null ? root : file.getParent();
-        return BatchCheckpointStore.relativePath(root, parent).toLowerCase(Locale.ROOT) + "|" + stem(file).toLowerCase(Locale.ROOT);
+        return BatchCheckpointStore.relativePath(root, parent).toLowerCase(Locale.ROOT) + "|" +
+            stem(file).toLowerCase(Locale.ROOT);
     }
 
     private static BasicFileAttributes attributes(final Path file) {
@@ -284,14 +284,14 @@ final class BatchSessionRunner implements WorkflowRunner {
         }
     }
 
-    private static OutputState outputState(final Path input, final long csvLinesBefore) {
-        final long currentLines = countCsvLines(csvPath(input));
+    private static OutputState outputState(final AnalysisOutputPaths outputs, final long csvLinesBefore) {
+        final long currentLines = countCsvLines(outputs.csv);
         final long expectedLines = csvLinesBefore == 0 ? 3 : csvLinesBefore + 1;
-        final int outputs = existingCleanedOutputCount(input);
-        if (currentLines == expectedLines && outputs == 3) {
+        final int outputCount = existingCleanedOutputCount(outputs);
+        if (currentLines == expectedLines && outputCount == 3) {
             return OutputState.COMMITTED;
         }
-        if (currentLines == csvLinesBefore && outputs == 0) {
+        if (currentLines == csvLinesBefore && outputCount == 0) {
             return OutputState.UNCHANGED;
         }
         return OutputState.AMBIGUOUS;
@@ -322,20 +322,9 @@ final class BatchSessionRunner implements WorkflowRunner {
         }
     }
 
-    private static Path csvPath(final Path input) {
-        return input.getParent().resolve("raw_data_table.csv");
-    }
-
-    private static boolean hasAnyCleanedOutput(final Path input) {
-        return existingCleanedOutputCount(input) > 0;
-    }
-
-    private static int existingCleanedOutputCount(final Path input) {
-        final Path cleaned = input.getParent().resolve("cleaned_images");
-        final String stem = stem(input);
+    private static int existingCleanedOutputCount(final AnalysisOutputPaths outputs) {
         int count = 0;
-        for (String prefix : new String[] {"axon_terminal", "muscle_endplate", "muscle_intermediate_endplate"}) {
-            final Path output = cleaned.resolve(prefix + stem + ".tif");
+        for (Path output : outputs.cleanedOutputs()) {
             try {
                 if (Files.isRegularFile(output) && Files.size(output) > 0) {
                     count++;
@@ -384,7 +373,4 @@ final class BatchSessionRunner implements WorkflowRunner {
         return directory == null ? null : Path.of(directory);
     }
 
-    private static String messageOrClass(final RuntimeException error) {
-        return error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
-    }
 }

@@ -8,10 +8,11 @@ import ij.io.OpenDialog;
 
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-final class InputWorkflowRunner implements WorkflowRunner {
+final class InputWorkflowRunner implements Runnable {
 
     static final String TIME_SERIES_ERROR =
         "Time-series images (T > 1) are not supported. Reduce the image to a single time point before running aNMJ-morph+.";
@@ -20,14 +21,9 @@ final class InputWorkflowRunner implements WorkflowRunner {
     private final Supplier<Path> fileSelector;
     private final Function<Path, ImagePlus> imageLoader;
     private final java.util.function.Consumer<ImagePlus> imagePresenter;
-    private final SingleImageProcessor singleImageProcessor;
-    private final WorkflowRunner batchRunner;
+    private final BiConsumer<ImagePlus, Path> singleImageProcessor;
+    private final Runnable batchRunner;
     private final java.util.function.Consumer<String> errorReporter;
-
-    @FunctionalInterface
-    interface SingleImageProcessor {
-        void analyze(ImagePlus image, Path inputPath);
-    }
 
     InputWorkflowRunner() {
         final ImageLoader loader = new ImageLoader();
@@ -48,8 +44,8 @@ final class InputWorkflowRunner implements WorkflowRunner {
         final Supplier<Path> fileSelector,
         final Function<Path, ImagePlus> imageLoader,
         final java.util.function.Consumer<ImagePlus> imagePresenter,
-        final SingleImageProcessor singleImageProcessor,
-        final WorkflowRunner batchRunner,
+        final BiConsumer<ImagePlus, Path> singleImageProcessor,
+        final Runnable batchRunner,
         final java.util.function.Consumer<String> errorReporter
     ) {
         this.currentImage = Objects.requireNonNull(currentImage, "currentImage");
@@ -91,7 +87,7 @@ final class InputWorkflowRunner implements WorkflowRunner {
     }
 
     private void analyze(final ImagePlus image, final Path inputPath, final boolean presentImage) {
-        if (InputPolicy.normalizationFor(ImageShape.from(image)) == InputNormalization.REJECT_TIME_SERIES) {
+        if (InputPolicy.normalizationFor(image) == InputNormalization.REJECT_TIME_SERIES) {
             if (presentImage) {
                 image.close();
             }
@@ -102,11 +98,11 @@ final class InputWorkflowRunner implements WorkflowRunner {
             imagePresenter.accept(image);
         }
         try {
-            singleImageProcessor.analyze(image, inputPath);
+            singleImageProcessor.accept(image, inputPath);
         } catch (AnalysisCancelledException e) {
             // User cancelled an interactive analysis step; no error dialog is needed.
         } catch (RuntimeException e) {
-            errorReporter.accept(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+            errorReporter.accept(Objects.toString(e.getMessage(), e.getClass().getSimpleName()));
         }
     }
 

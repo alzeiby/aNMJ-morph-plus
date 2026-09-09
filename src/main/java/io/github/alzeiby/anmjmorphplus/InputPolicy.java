@@ -1,21 +1,23 @@
 package io.github.alzeiby.anmjmorphplus;
 
+import ij.ImagePlus;
+
 final class InputPolicy {
 
     private InputPolicy() {
     }
 
-    static InputNormalization normalizationFor(final ImageShape shape) {
-        if (shape.frames() > 1) {
+    static InputNormalization normalizationFor(final ImagePlus image) {
+        if (image.getNFrames() > 1) {
             return InputNormalization.REJECT_TIME_SERIES;
         }
-        if (shape.isSingleSliceRgb()) {
+        if (image.getNChannels() == 1 && image.getNSlices() == 1 && image.getBitDepth() == 24) {
             return InputNormalization.RGB_TO_CHANNELS;
         }
-        if (shape.channels() == 1 && shape.slices() == 2) {
+        if (image.getNChannels() == 1 && image.getNSlices() == 2) {
             return InputNormalization.CHOOSE_TWO_PLANE_INTERPRETATION;
         }
-        if (shape.slices() > 1) {
+        if (image.getNSlices() > 1) {
             return InputNormalization.MAX_PROJECT_Z;
         }
         return InputNormalization.USE_AS_IS;

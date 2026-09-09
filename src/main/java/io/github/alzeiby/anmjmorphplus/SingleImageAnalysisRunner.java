@@ -1,8 +1,6 @@
 package io.github.alzeiby.anmjmorphplus;
 
-import ij.IJ;
 import ij.ImagePlus;
-import ij.gui.GenericDialog;
 import ij.io.DirectoryChooser;
 import ij.io.FileInfo;
 
@@ -17,7 +15,7 @@ final class SingleImageAnalysisRunner {
 
     void analyze(ImagePlus image, final Path selectedPath) {
         final Path inputPath = selectedPath == null ? pathForCurrentImage(image) : selectedPath;
-        final InputNormalization normalization = InputPolicy.normalizationFor(ImageShape.from(image));
+        final InputNormalization normalization = InputPolicy.normalizationFor(image);
         if (normalization == InputNormalization.REJECT_TIME_SERIES) {
             throw new IllegalArgumentException(InputWorkflowRunner.TIME_SERIES_ERROR);
         }
@@ -58,44 +56,21 @@ final class SingleImageAnalysisRunner {
     }
 
     private static TwoPlaneInterpretation chooseTwoPlane() {
-        final GenericDialog dialog = new GenericDialog("Two-plane image detected");
-        dialog.addMessage(
-            "This image contains one channel and two planes. Choose how the two planes should be interpreted."
-        );
-        dialog.addChoice(
-            "Interpret as",
-            new String[] {"Two channels (Keyence/two-page export)", "Z stack (maximum-project)"},
-            "Two channels (Keyence/two-page export)"
-        );
-        dialog.showDialog();
-        if (dialog.wasCanceled()) {
+        final BatchChoiceResolver.PromptResult<TwoPlaneInterpretation> result =
+            BatchChoiceResolver.promptTwoPlane(false);
+        if (result == null) {
             throw new AnalysisCancelledException();
         }
-        return dialog.getNextChoiceIndex() == 0
-            ? TwoPlaneInterpretation.CHANNELS
-            : TwoPlaneInterpretation.Z_STACK;
+        return result.value;
     }
 
     private static BatchChoiceResolver.ChannelChoice chooseChannels(final int channelCount) {
-        final String[] channels = new String[channelCount];
-        for (int i = 0; i < channelCount; i++) {
-            channels[i] = Integer.toString(i + 1);
+        final BatchChoiceResolver.PromptResult<BatchChoiceResolver.ChannelChoice> result =
+            BatchChoiceResolver.promptChannels(channelCount, false);
+        if (result == null) {
+            throw new AnalysisCancelledException();
         }
-        while (true) {
-            final GenericDialog dialog = new GenericDialog("aNMJ-morph+ channel assignment");
-            dialog.addChoice("Muscle endplate channel", channels, channels[0]);
-            dialog.addChoice("Nerve terminal channel", channels, channels[1]);
-            dialog.showDialog();
-            if (dialog.wasCanceled()) {
-                throw new AnalysisCancelledException();
-            }
-            final int muscle = dialog.getNextChoiceIndex() + 1;
-            final int nerve = dialog.getNextChoiceIndex() + 1;
-            if (muscle != nerve) {
-                return new BatchChoiceResolver.ChannelChoice(muscle, nerve);
-            }
-            IJ.error("aNMJ-morph+", "Muscle endplate and nerve terminal must use different channels.");
-        }
+        return result.value;
     }
 
     static Path pathForCurrentImage(final ImagePlus image) {
