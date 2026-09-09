@@ -20,10 +20,17 @@ This fork preserves the original seven-step workflow while adding rectangular-im
 
 ## Installation
 
+The project is being migrated from an ImageJ macro to a Java/SciJava Fiji plugin. The Java command is packaged as a normal Maven JAR and appears at **Analyze > Tools > aNMJ-morph+**. During the migration it delegates to the packaged canonical macro, so the scientific workflow remains unchanged while Java components replace it incrementally.
+
 1. Install Fiji.
 2. Install the Binary Connectivity plugin.
-3. Download or clone this repository.
-4. Open `aNMJ-morph macro.txt` in Fiji's macro editor and run it.
+3. Build the plugin with `mvn package`.
+4. Copy `target/anmj-morph-plus-0.1.0-SNAPSHOT.jar` into Fiji's `plugins/` directory and restart Fiji or refresh menus.
+5. Run **Analyze > Tools > aNMJ-morph+**.
+
+Developers can also install a build directly with `mvn -Dscijava.app.directory=/path/to/Fiji.app/`.
+
+The root `aNMJ-morph macro.txt` remains the canonical reference implementation during the Java migration.
 
 The macro expects Fiji's standard `StartupMacros.fiji.ijm` file in the Fiji macros directory.
 
@@ -31,15 +38,17 @@ The macro expects Fiji's standard `StartupMacros.fiji.ijm` file in the Fiji macr
 
 ### Single image
 
-1. Open an NMJ image in Fiji.
-2. Run `aNMJ-morph macro.txt`.
-3. Resolve the dimensionality prompt if the input is ambiguous.
-4. Select the muscle-endplate and nerve-terminal channels.
-5. Follow the seven on-screen steps for thresholding, axon measurement/cleanup, segmentation review, and output.
+Run **Analyze > Tools > aNMJ-morph+**. If no image is open, choose **Single image** and select the file. You can also open an NMJ image first and then run the command.
+
+Then:
+
+1. Resolve the dimensionality prompt if the input is ambiguous.
+2. Select the muscle-endplate and nerve-terminal channels.
+3. Follow the seven on-screen steps for thresholding, axon measurement/cleanup, segmentation review, and output.
 
 ### Batch mode
 
-Run the macro with **no image open**. Select a directory when prompted. The macro searches recursively, skips generated `cleaned_images` directories, and processes supported images one at a time.
+Run **Analyze > Tools > aNMJ-morph+** with **no image open**, choose **Batch folder**, and select the directory. The workflow searches recursively, skips generated `cleaned_images` directories, and processes supported images one at a time.
 
 Batch mode remains interactive because channel selection, threshold review, and segmentation review still require user input.
 
@@ -108,7 +117,7 @@ Original method and supporting references:
 
 GitHub Actions checks the repository on pushes and pull requests, including the rectangular-image formula, dimensionality guards, channel ordering, TIFF batch support, output naming, bundled reference images, licensing attribution, citation metadata, and basic macro syntax structure.
 
-Tags matching `v*` validate the repository and build a release archive containing the macro, README, `LICENSE`, `CITATION.cff`, reference spreadsheet, reference images, and a SHA-256 checksum.
+Tags matching `v*` validate the repository and build a release archive containing the installable Java plugin JAR, canonical macro, README, `LICENSE`, `CITATION.cff`, reference spreadsheet, reference images, and a SHA-256 checksum.
 
 ## License
 
