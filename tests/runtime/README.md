@@ -22,7 +22,7 @@ By default the runner generates fresh harnesses from `aNMJ-morph macro.txt`, run
 - both deterministic interpretations of ambiguous `C=1/Z=2/T=1` input;
 - explicit `T>1` rejection;
 - completion through stage 7;
-- batch-supplied channel choices and Java-created source/template duplicate IDs preserve the pinned numerical result while leaving downstream Split Channels/threshold/manual stages macro-owned;
+- batch-supplied channel choices, Java-created source/template duplicate IDs, and the two early Java Split Channels boundaries preserve the pinned numerical result while leaving threshold/manual and later analysis stages macro-owned;
 - 29-column data rows;
 - row-specific spreadsheet formulas;
 - append behavior without duplicate headers or blank separator rows;
@@ -77,6 +77,8 @@ This headless subset covers `.tif`, `.tiff`, uppercase `.TIF`/`.TIFF`, spaces in
 GitHub Actions runs the integration harness on a pinned fresh Windows Fiji build whenever the production macro, Java sources, Maven project, or runtime tests change. The workflow verifies the Fiji archive checksum, installs the pinned Morphology/BinaryConnectivity dependency, builds and smoke-tests the Java plugin JAR in that fresh Fiji installation, runs the deterministic fixture matrix, two square analyses, and two rectangular analyses, then checks the pinned numerical oracle plus CSV/TIFF outputs. The lightweight repository workflow also verifies harness/probe generation and baseline hashes without launching Fiji.
 
 Fresh-Fiji CI also runs hidden/headless fail-closed probes for both the source-copy and template-copy bridges. Each probe covers a present unresolved ID and a present wrong-title ID, asserts the exact production parser error, rejects legacy fallback execution, and verifies Fiji cleanup.
+
+The early Split Channels bridge has separate hidden fail-closed probes for the original and template split sites. Each forces the selected Java call to fail after the Java path was explicitly requested, requires the production Java error branch, and proves the corresponding legacy `Split Channels` fallback does not run.
 
 ## Focused probes
 

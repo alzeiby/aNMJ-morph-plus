@@ -114,10 +114,33 @@ jobs:
         run: |
           .\tests\runtime\run_template_copy_failclosed_probes.ps1 -FijiRoot $env:FIJI_ROOT -TimeoutSeconds 60
 
+      - name: Verify early Split Channels bridge
+        shell: powershell
+        run: |
+          $jar = Get-ChildItem -LiteralPath .\target -Filter 'anmj-morph-plus-*.jar' |
+            Where-Object {
+              $_.Name -notlike '*-sources.jar' -and
+              $_.Name -notlike '*-javadoc.jar' -and
+              $_.Name -notlike '*-tests.jar'
+            } |
+            Select-Object -First 1
+          if (-not $jar) { throw 'Could not find built aNMJ-morph+ plugin JAR' }
+          .\tests\runtime\run_split_channels_jit_probe.ps1 -FijiRoot $env:FIJI_ROOT -PluginJar $jar.FullName -TimeoutSeconds 60
+          .\tests\runtime\run_split_channels_failclosed_probe.ps1 -FijiRoot $env:FIJI_ROOT -PluginJar $jar.FullName -Site original -TimeoutSeconds 60
+          .\tests\runtime\run_split_channels_failclosed_probe.ps1 -FijiRoot $env:FIJI_ROOT -PluginJar $jar.FullName -Site template -TimeoutSeconds 60
+
       - name: Run fixture matrix and regression workflows
         shell: powershell
         run: |
-          .\tests\runtime\run_validation.ps1 -FijiRoot $env:FIJI_ROOT -Runs 2 -TimeoutSeconds 180
+          $jar = Get-ChildItem -LiteralPath .\target -Filter 'anmj-morph-plus-*.jar' |
+            Where-Object {
+              $_.Name -notlike '*-sources.jar' -and
+              $_.Name -notlike '*-javadoc.jar' -and
+              $_.Name -notlike '*-tests.jar'
+            } |
+            Select-Object -First 1
+          if (-not $jar) { throw 'Could not find built aNMJ-morph+ plugin JAR' }
+          .\tests\runtime\run_validation_with_plugin.ps1 -FijiRoot $env:FIJI_ROOT -PluginJar $jar.FullName -Runs 2 -TimeoutSeconds 180
 
       - name: Upload runtime outputs on failure
         if: failure()

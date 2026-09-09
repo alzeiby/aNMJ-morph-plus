@@ -67,6 +67,7 @@ public final class JavaPluginSmoke {
             command.loadClass();
             smokeStructuralNormalizer();
             smokeChannelRoleCanonicalizer();
+            smokeEarlySplitChannelsBridge();
             smokeBatchProjectionBridge();
             require(IJ.getInstance() == null, "Java plugin smoke unexpectedly created an ImageJ UI instance");
             final int[] remainingImageIds = WindowManager.getIDList();
@@ -75,6 +76,47 @@ public final class JavaPluginSmoke {
                 "Java plugin smoke left ImageJ images registered after cleanup"
             );
             System.out.println("DONE java plugin smoke");
+        }
+    }
+
+    private static void smokeEarlySplitChannelsBridge() throws Exception {
+        final ImageStack stack = new ImageStack(2, 1);
+        stack.addSlice(new ByteProcessor(2, 1, new byte[] {7, 9}, null));
+        stack.addSlice(new ByteProcessor(2, 1, new byte[] {19, 23}, null));
+        final ImagePlus base = new ImagePlus("fresh-fiji-split.tif", stack);
+        base.setDimensions(2, 1, 1);
+        base.setOpenAsHyperStack(true);
+        final CompositeImage source = new CompositeImage(base, CompositeImage.COMPOSITE);
+        final boolean previousBatchMode = Interpreter.batchMode;
+        final ImagePlus previousTemp = WindowManager.getTempCurrentImage();
+        Interpreter.batchMode = true;
+        Interpreter.addBatchModeImage(source);
+        WindowManager.setTempCurrentImage(source);
+        try {
+            source.setC(1);
+            final Class<?> bridgeClass = Class.forName(
+                "io.github.alzeiby.anmjmorphplus.EarlySplitChannelsBridge"
+            );
+            final Method splitCurrent = bridgeClass.getMethod("splitCurrent");
+            final String status = (String) splitCurrent.invoke(null);
+            require(status.startsWith("OK;"), "Fresh-Fiji Split Channels bridge failed: " + status);
+            require(WindowManager.getImage(source.getID()) == null, "Fresh-Fiji split source stayed open");
+            final ImagePlus c1 = WindowManager.getImage("C1-fresh-fiji-split.tif");
+            final ImagePlus c2 = WindowManager.getImage("C2-fresh-fiji-split.tif");
+            require(c1 != null && c2 != null && c1.getID() != c2.getID(), "Fresh-Fiji split outputs missing");
+            require(
+                status.equals("OK;" + c1.getID() + ";" + c2.getID()),
+                "Fresh-Fiji split status did not return exact C1/C2 IDs: " + status
+            );
+            require(c1.getProcessor().get(0, 0) == 7, "Fresh-Fiji split C1 pixels changed");
+            require(c2.getProcessor().get(0, 0) == 19, "Fresh-Fiji split C2 pixels changed");
+            require(WindowManager.getCurrentImage() == c2, "Fresh-Fiji split did not leave C2 current");
+            Interpreter.removeBatchModeImage(c1);
+            Interpreter.removeBatchModeImage(c2);
+        } finally {
+            Interpreter.removeBatchModeImage(source);
+            WindowManager.setTempCurrentImage(previousTemp);
+            Interpreter.batchMode = previousBatchMode;
         }
     }
 
@@ -361,13 +403,14 @@ public final class JavaPluginSmoke {
             channelChoiceClass,
             boolean.class,
             int.class,
-            int.class
+            int.class,
+            boolean.class
         );
         buildMacroArgument.setAccessible(true);
         final ImagePlus plainTwoChannel = twoPlane(7, 19);
         plainTwoChannel.setDimensions(2, 1, 1);
         require(!plainTwoChannel.isComposite(), "Plain two-channel smoke fixture unexpectedly composite");
-        final String plainArgument = (String) buildMacroArgument.invoke(null, plainTwoChannel, oneTwo, false, -12345, -12346);
+        final String plainArgument = (String) buildMacroArgument.invoke(null, plainTwoChannel, oneTwo, false, -12345, -12346, true);
         require(
             !plainArgument.contains("channels-canonical="),
             "Plain two-channel bridge unexpectedly skipped legacy Arrange"
@@ -380,8 +423,9 @@ public final class JavaPluginSmoke {
             plainArgument.contains("template-copy-id=-12346"),
             "Plain two-channel bridge omitted template-copy ID"
         );
+        require(plainArgument.contains("early-split-java=1"), "Plain two-channel bridge omitted early split flag");
         require(!interpreted.isComposite(), "C1/Z2 CHANNELS fixture unexpectedly composite");
-        final String twoPlaneArgument = (String) buildMacroArgument.invoke(null, interpreted, oneTwo, false, -23456, -23457);
+        final String twoPlaneArgument = (String) buildMacroArgument.invoke(null, interpreted, oneTwo, false, -23456, -23457, true);
         require(
             !twoPlaneArgument.contains("channels-canonical="),
             "C1/Z2 CHANNELS bridge unexpectedly skipped legacy Arrange"
@@ -394,6 +438,7 @@ public final class JavaPluginSmoke {
             twoPlaneArgument.contains("template-copy-id=-23457"),
             "C1/Z2 CHANNELS bridge omitted template-copy ID"
         );
+        require(twoPlaneArgument.contains("early-split-java=1"), "C1/Z2 CHANNELS bridge omitted early split flag");
     }
 
     private static void smokeBatchProjectionBridge() throws Exception {
