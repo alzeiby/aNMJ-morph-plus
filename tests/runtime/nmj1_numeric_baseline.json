@@ -7,7 +7,7 @@
   "macro": {
     "normalized_sha256": "2a9d9c738bf31b23cf70a9ec7d4ff862a23e9748363a7c50a6a4a12dd956038b",
     "oracle_output_commit": "756cbeb4f7d27026e6e03f35b542e81d4fdba2ee",
-    "current_macro_commit_when_pinned": "5c7dda44bb91ab29898b658184ed447f328cba50"
+    "current_macro_commit_when_pinned": "aa78dbdaca4cb4cc1243318743138f2a3c1a0723"
   },
   "automation": {
     "muscle_endplate_channel": 1,
@@ -23,7 +23,7 @@
     "fiji_archive": "fiji-win64-20260718.zip",
     "fiji_archive_sha256": "5267fc8470c4f87cb948848898cc0dc62f74b69a78f3abf2a8643fe3a4af6c4a",
     "morphology_collection_sha256": "694de653a7e79c52eec3b7a47f75414d93cb317b4f6402d3c8fba05d255e0b7c",
-    "note": "Numerical oracle captured from the automated fresh-Fiji NMJ_1.lsm seven-stage run at 756cbeb. The current macro hash includes Java exact-image, optional batch channel/two-plane argument plumbing, and Java source/template duplicate ID bridges; scientific expectations remain unchanged and must pass the same pinned runtime oracle. Update intentionally if the pinned runtime stack or scientific behavior changes."
+    "note": "Numerical oracle captured from the automated fresh-Fiji NMJ_1.lsm seven-stage run at 756cbeb. The current macro hash includes Java exact-image, optional batch channel/two-plane argument plumbing, Java source/template duplicate ID bridges, and the two early Java Split Channels bridges; scientific expectations remain unchanged and must pass the same pinned runtime oracle. Update intentionally if the pinned runtime stack or scientific behavior changes."
   },
   "exact_fields": {
     "image_dimensions_pixels": {
