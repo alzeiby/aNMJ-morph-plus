@@ -454,6 +454,8 @@ public final class JavaPluginSmoke {
                 super.close();
             }
         };
+        final boolean previousBatchMode = Interpreter.batchMode;
+        Interpreter.batchMode = true;
         Interpreter.addBatchModeImage(sentinel);
 
         final List<ImagePlus> presentedImages = new ArrayList<>();
@@ -528,6 +530,7 @@ public final class JavaPluginSmoke {
                 Interpreter.removeBatchModeImage(image);
             }
             Interpreter.removeBatchModeImage(sentinel);
+            Interpreter.batchMode = previousBatchMode;
         }
     }
 
