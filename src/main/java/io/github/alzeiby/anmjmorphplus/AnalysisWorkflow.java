@@ -15,6 +15,11 @@ import ij.plugin.ZProjector;
 import ij.plugin.filter.Analyzer;
 import ij.plugin.frame.ThresholdAdjuster;
 import ij.plugin.tool.BrushTool;
+import sc.fiji.analyzeSkeleton.AnalyzeSkeleton_;
+import sc.fiji.analyzeSkeleton.Edge;
+import sc.fiji.analyzeSkeleton.Graph;
+import sc.fiji.analyzeSkeleton.SkeletonResult;
+import sc.fiji.analyzeSkeleton.Vertex;
 
 import java.awt.Color;
 import java.awt.Window;
@@ -126,14 +131,21 @@ final class AnalysisWorkflow {
         IJ.run(original.nerve, "Make Binary", "thresholded remaining black");
         IJ.run(original.nerve, "Convert to Mask", "");
         IJ.run(original.nerve, "Skeletonize", "");
-        final double branchPixelSize = AnisotropicSkeletonCalibration.effectivePixelSize(original.nerve);
-        IJ.run(original.nerve, "BinaryConnectivity ", "white");
-        final int[] histogram = original.nerve.getProcessor().getHistogram();
-        final double counts0 = histogram[0];
-        final double counts2 = histogram[2];
-        final double counts4 = histogram[4];
-        final double counts5 = histogram[5];
-        final double totalLengthOfBranches = ((double) width * height - counts0) * branchPixelSize;
+        final AnalyzeSkeleton_ analyzer = new AnalyzeSkeleton_();
+        analyzer.setup("", original.nerve);
+        final SkeletonResult skeleton = analyzer.run(AnalyzeSkeleton_.NONE, false, false, null, true, false);
+        double totalLengthOfBranches = 0.0;
+        int terminalBranches = 0;
+        for (Graph graph : skeleton.getGraph()) {
+            for (Edge edge : graph.getEdges()) totalLengthOfBranches += edge.getLength();
+            for (Vertex vertex : graph.getVertices()) {
+                if (vertex.getBranches().size() == 1 &&
+                    vertex.getBranches().get(0).getV1() != vertex.getBranches().get(0).getV2()) terminalBranches++;
+            }
+        }
+        final int branchPoints = sum(skeleton.getJunctions());
+        final int tripleJunctions = sum(skeleton.getTriples());
+        final int quadrupleJunctions = sum(skeleton.getQuadruples());
         closeImage(original.nerve);
 
         IJ.run(original.muscle, "Create Selection", "");
@@ -206,9 +218,9 @@ final class AnalysisWorkflow {
             quote(width + " x " + height),
             quote(format(pixelSizeX * width) + " x " + format(pixelSizeY * height) + sizeUnit),
             inputPath.getFileName().toString(), thresholdNerve + "/" + thresholdEndplate, "", format(axonDiameter),
-            format(nerveMeasurement[1]), format(nerveMeasurement[0]), format(counts0), format(counts2), format(counts4),
-            format(counts5), quote("=J" + row), quote("=(K" + row + "+L" + row + ")*0.28"),
-            format(totalLengthOfBranches), quote("=O" + row + "/J" + row),
+            format(nerveMeasurement[1]), format(nerveMeasurement[0]), format(skeleton.getNumOfTrees()), format(terminalBranches),
+            format(tripleJunctions), format(quadrupleJunctions), quote("=J" + row), format(branchPoints),
+            format(totalLengthOfBranches), quote("=O" + row + "/M" + row),
             quote("=LOG10(M" + row + "*N" + row + "*O" + row + ")"), format(achrMeasurement[1]),
             format(achrMeasurement[0]), format(endplateMeasurement[2]), format(endplateMeasurement[1]),
             format(endplateMeasurement[0]), quote("=S" + row + "/V" + row + "*100"), format(unoccupiedMeasurement[0]),
@@ -293,7 +305,13 @@ final class AnalysisWorkflow {
     private static final String CSV_HEADER_1 =
         "IMAGE DETAILS (frame size),,NMJ,THRESHOLD,PRE-SYNAPTIC,,,,Branch analysis,,,,,,,,,POST-SYNAPTIC";
     private static final String CSV_HEADER_2 =
-        "\"Number of pixels (eg, 512 x 512)\",\"Metric (eg, 67.48 x 67.48um)\",\"Ref number\",\"(nerve terminal/motor endplate)\",\"Number of Axonal Inputs\",\"Axon Diameter (um)\",\"Nerve Terminal Perimeter (um)\",\"Nerve Terminal Area (um2)\",\"Value 0 (background white pixels)\",\"Value 2 (terminal pixels)\",\"Value 4 (three-point branch pixels)\",\"Value 5 (four-point branch pixels)\",\" Number of Terminal Branches\",\"Number of Branch Points\",\"Total Length of Branches (um)\",\"Average Length of Branches (um)\",\"\"\"Complexity\"\"\",\"AChR Perimeter (um)\",\"AChR Area (um2)\",\"Endplate Diameter (um)\",\"Endplate Perimeter (um)\",\"Endplate Area (um2)\",\"\"\"Compactness\"\" (%)\",\"Unoccupied AChR Area (um2)\",\"\"\"Area of Synaptic Contact\"\" (um2)\",\"\"\"Overlap\"\" (%)\",\"Number of AChR Clusters\",\"Average Area of AChR Clusters (um2)\",\"\"\"Fragmentation\"\"\"";
+        "\"Number of pixels (eg, 512 x 512)\",\"Metric (eg, 67.48 x 67.48um)\",\"Ref number\",\"(nerve terminal/motor endplate)\",\"Number of Axonal Inputs\",\"Axon Diameter (um)\",\"Nerve Terminal Perimeter (um)\",\"Nerve Terminal Area (um2)\",\"Skeleton Trees\",\"Terminal Tips\",\"Triple Junctions\",\"Quadruple Junctions\",\" Number of Terminal Branches\",\"Number of Branch Points\",\"Total Length of Branches (um)\",\"Average Length of Branches (um)\",\"\"\"Complexity\"\"\",\"AChR Perimeter (um)\",\"AChR Area (um2)\",\"Endplate Diameter (um)\",\"Endplate Perimeter (um)\",\"Endplate Area (um2)\",\"\"\"Compactness\"\" (%)\",\"Unoccupied AChR Area (um2)\",\"\"\"Area of Synaptic Contact\"\" (um2)\",\"\"\"Overlap\"\" (%)\",\"Number of AChR Clusters\",\"Average Area of AChR Clusters (um2)\",\"\"\"Fragmentation\"\"\"";
+
+    private static int sum(final int[] values) {
+        int total = 0;
+        for (int value : values) total += value;
+        return total;
+    }
 
     private static double meanLength(final ResultsTable table) {
         if (table == null || table.size() == 0) {

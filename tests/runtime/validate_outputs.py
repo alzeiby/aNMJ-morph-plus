@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_BASELINE = Path(__file__).resolve().parent / "nmj1_numeric_baseline.json"
 HEADER_1 = "IMAGE DETAILS (frame size),,NMJ,THRESHOLD,PRE-SYNAPTIC,,,,Branch analysis,,,,,,,,,POST-SYNAPTIC"
-HEADER_2 = '"Number of pixels (eg, 512 x 512)","Metric (eg, 67.48 x 67.48um)","Ref number","(nerve terminal/motor endplate)","Number of Axonal Inputs","Axon Diameter (um)","Nerve Terminal Perimeter (um)","Nerve Terminal Area (um2)","Value 0 (background white pixels)","Value 2 (terminal pixels)","Value 4 (three-point branch pixels)","Value 5 (four-point branch pixels)"," Number of Terminal Branches","Number of Branch Points","Total Length of Branches (um)","Average Length of Branches (um)","""Complexity""","AChR Perimeter (um)","AChR Area (um2)","Endplate Diameter (um)","Endplate Perimeter (um)","Endplate Area (um2)","""Compactness"" (%)","Unoccupied AChR Area (um2)","""Area of Synaptic Contact"" (um2)","""Overlap"" (%)","Number of AChR Clusters","Average Area of AChR Clusters (um2)","""Fragmentation"""'
+HEADER_2 = '"Number of pixels (eg, 512 x 512)","Metric (eg, 67.48 x 67.48um)","Ref number","(nerve terminal/motor endplate)","Number of Axonal Inputs","Axon Diameter (um)","Nerve Terminal Perimeter (um)","Nerve Terminal Area (um2)","Skeleton Trees","Terminal Tips","Triple Junctions","Quadruple Junctions"," Number of Terminal Branches","Number of Branch Points","Total Length of Branches (um)","Average Length of Branches (um)","""Complexity""","AChR Perimeter (um)","AChR Area (um2)","Endplate Diameter (um)","Endplate Perimeter (um)","Endplate Area (um2)","""Compactness"" (%)","Unoccupied AChR Area (um2)","""Area of Synaptic Contact"" (um2)","""Overlap"" (%)","Number of AChR Clusters","Average Area of AChR Clusters (um2)","""Fragmentation"""'
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -48,7 +48,7 @@ def validate_baseline_inputs(baseline: dict[str, object]) -> None:
             f"expected {macro['normalized_sha256']}. Update the oracle intentionally if scientific output changed."
         )
     runtime_workflow = (ROOT / ".github" / "workflows" / "fiji-runtime.yml").read_text(encoding="utf-8")
-    for key in ("fiji_archive", "fiji_archive_sha256", "morphology_collection_sha256"):
+    for key in ("fiji_archive", "fiji_archive_sha256"):
         expected = str(environment[key])
         if expected not in runtime_workflow:
             raise AssertionError(f"Pinned numerical-oracle environment {key}={expected!r} is not used by Fiji runtime CI")
@@ -113,9 +113,11 @@ def validate_case(
             raise AssertionError(f"Row {offset} input name is {row[2]!r}, expected {expected_name!r}")
         if row[12] != f"=J{offset}":
             raise AssertionError(f"Row {offset} terminal-branch formula is wrong: {row[12]!r}")
-        if row[13] != f"=(K{offset}+L{offset})*0.28":
-            raise AssertionError(f"Row {offset} branch-point formula is wrong: {row[13]!r}")
-        if row[15] != f"=O{offset}/J{offset}":
+        try:
+            float(row[13])
+        except ValueError as exc:
+            raise AssertionError(f"Row {offset} Analyze Skeleton branch-point count is not numeric: {row[13]!r}") from exc
+        if row[15] != f"=O{offset}/M{offset}":
             raise AssertionError(f"Row {offset} average-branch-length formula is wrong: {row[15]!r}")
         if numerical_baseline is not None:
             validate_numeric_oracle(row, numerical_baseline, offset)

@@ -16,17 +16,16 @@ This fork preserves the original seven-step workflow as a Java/SciJava Fiji plug
 ## Requirements
 
 - [Fiji](https://fiji.sc/) / ImageJ
-- **Binary Connectivity** from Gabriel Landini's Morphological Operators for ImageJ [4]
+- Fiji's bundled **Analyze Skeleton** plugin
 
 ## Installation
 
 The analysis runtime is implemented as a Java/SciJava Fiji plugin. The command is packaged as a normal Maven JAR and appears at **Analyze > Tools > aNMJ-morph+**. Image processing is delegated to the corresponding Fiji/ImageJ commands and APIs rather than reimplemented in project code.
 
 1. Install Fiji.
-2. Install the Binary Connectivity plugin.
-3. Build the plugin with `mvn package`.
-4. Copy `target/anmj-morph-plus-0.1.0-SNAPSHOT.jar` into Fiji's `plugins/` directory and restart Fiji or refresh menus.
-5. Run **Analyze > Tools > aNMJ-morph+**.
+2. Build the plugin with `mvn package`.
+3. Copy `target/anmj-morph-plus-0.1.0-SNAPSHOT.jar` into Fiji's `plugins/` directory and restart Fiji or refresh menus.
+4. Run **Analyze > Tools > aNMJ-morph+**.
 
 Developers can also install a build directly with `mvn -Dscijava.app.directory=/path/to/Fiji.app/`.
 
@@ -48,9 +47,9 @@ Then:
 
 ### Batch mode
 
-Run **Analyze > Tools > aNMJ-morph+** with **no image open**, choose **Batch folder**, and select the directory. Java searches recursively, skips generated `cleaned_images` directories, and processes supported images one at a time. Per-file status and failure reasons are checkpointed under `<batch folder>/.anmj-morph-plus/session-v1.tsv`, separate from `raw_data_table.csv`. Completed files are skipped on resume, while interrupted runs are reconciled against the CSV and cleaned TIFFs before any retry. A file error is recorded and the batch continues; cancelling an interactive step stops the batch without discarding completed checkpoint state.
+Run **Analyze > Tools > aNMJ-morph+** with **no image open**, choose **Batch folder**, and select the directory. Java searches recursively, skips generated `cleaned_images` directories, and processes supported images one at a time. A file error is logged and the batch continues; cancelling an interactive step stops the batch.
 
-Batch mode remains interactive. Channel and ambiguous two-plane choices can be reused for later files with the same conservative input signature only when **Apply to remaining matching files** is explicitly selected. Threshold review, axon measurements/cleanup, and segmentation review are never remembered and still require user input for each image.
+Batch mode remains interactive. Channel selection, ambiguous two-plane interpretation, threshold review, axon measurements/cleanup, and segmentation review are performed for each image.
 
 Supported extensions:
 
@@ -79,17 +78,13 @@ The plugin writes:
 
 The repository also retains the original tutorial video, 20 reference NMJ images, and the reference spreadsheet distributed with the Edinburgh DataShare dataset [3].
 
-### Rectangular-image compatibility
+### Branch analysis and rectangular-image compatibility
 
-The original macro used one side length for frame-size calculations. aNMJ-morph+ tracks width and height independently and retains the original skeleton-pixel-count branch-length estimator:
+The original macro estimated total branch length from the number of foreground skeleton pixels and estimated branch points from a fixed correction applied to junction-pixel counts. aNMJ-morph+ now delegates those measurements to Fiji Analyze Skeleton: total branch length is the sum of calibrated graph-edge lengths, so horizontal, vertical, and diagonal steps use their actual X/Y physical calibration; terminal branches remain the original biological quantity of degree-1 terminal tips, with isolated one-pixel components excluded; and branch points are the grouped graph junction count rather than the historical `0.28` pixel heuristic.
 
-```text
-(width × height - background skeleton pixels) × calibrated skeleton-pixel scale
-```
+The CSV remains 29 columns wide. The four former Binary Connectivity diagnostic columns are now `Skeleton Trees`, `Terminal Tips`, `Triple Junctions`, and `Quadruple Junctions`. Because the branch method is intentionally corrected, branch length and branch-point values are not numerically identical to historical aNMJ-morph output. On the pinned NMJ_1 reference, terminal branches remain 99, branch points change from 45.36 to 49, and total length changes from 292.70164895 µm to 331.89935592 µm.
 
-For isotropic pixels, the calibrated skeleton-pixel scale is exactly `pixelWidth`, so published/reference isotropic values remain mathematically identical to the original formula. For anisotropic X/Y pixels, aNMJ-morph+ treats each disconnected 8-connected skeleton component independently, counts its horizontal, vertical, and non-redundant diagonal neighbor steps, and weights those orientations by `pixelWidth`, `pixelHeight`, and `hypot(pixelWidth, pixelHeight)` respectively. Each component's physical-to-unit-grid stretch ratio is applied to that component's unchanged legacy foreground-pixel count, and the component contributions are summed. An isolated skeleton pixel has no orientation, so it uses the symmetric geometric-mean X/Y scale. This corrects the former X-only scaling without replacing the underlying aNMJ-morph branch-length definition or allowing one disconnected branch to change another branch's calibration.
-
-ImageJ's line length, area, perimeter, and Feret measurements already use X/Y calibration directly and are not rescaled by this correction. The plugin still warns on unequal X/Y sampling because pixel-domain operations such as threshold cleanup, skeletonization, connectivity, and rolling-background processing remain dependent on acquisition sampling density even when reported geometric measurements are calibrated. The first two CSV metadata columns contain `width x height` values rather than a single scalar side length, so downstream scripts that parse those columns may need to be updated.
+The plugin still warns on unequal X/Y sampling because pixel-domain preprocessing remains dependent on acquisition sampling density even though Analyze Skeleton reports calibrated geometry. The first two CSV metadata columns contain `width x height` values rather than a single scalar side length, so downstream scripts that parse those columns may need to be updated.
 
 ## Validation and scientific use
 

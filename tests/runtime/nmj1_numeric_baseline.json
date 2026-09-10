@@ -22,8 +22,7 @@
     "bio_formats": "8.5.0",
     "fiji_archive": "fiji-win64-20260718.zip",
     "fiji_archive_sha256": "5267fc8470c4f87cb948848898cc0dc62f74b69a78f3abf2a8643fe3a4af6c4a",
-    "morphology_collection_sha256": "694de653a7e79c52eec3b7a47f75414d93cb317b4f6402d3c8fba05d255e0b7c",
-    "note": "Numerical oracle captured from the automated fresh-Fiji NMJ_1.lsm seven-stage run at 756cbeb. The current macro hash includes Java exact-image, optional batch channel/two-plane argument plumbing, Java source/template duplicate ID bridges, and the two early Java Split Channels bridges; scientific expectations remain unchanged and must pass the same pinned runtime oracle. Update intentionally if the pinned runtime stack or scientific behavior changes."
+    "note": "The image-processing oracle remains pinned to the historical NMJ_1 workflow, while branch topology and calibrated centerline length intentionally use Fiji Analyze Skeleton 3.4.2. Terminal branches are degree-1 graph tips excluding isolated pixels; branch points are grouped graph junctions."
   },
   "exact_fields": {
     "image_dimensions_pixels": {
@@ -59,29 +58,34 @@
       "expected": 452.57889814,
       "abs_tolerance": 0.0001
     },
-    "connectivity_background_pixels": {
+    "skeleton_trees": {
       "column": 8,
-      "expected": 259923,
+      "expected": 32,
       "abs_tolerance": 0
     },
-    "connectivity_terminal_pixels": {
+    "terminal_tips": {
       "column": 9,
       "expected": 99,
       "abs_tolerance": 0
     },
-    "connectivity_three_point_pixels": {
+    "triple_junctions": {
       "column": 10,
-      "expected": 139,
+      "expected": 47,
       "abs_tolerance": 0
     },
-    "connectivity_four_point_pixels": {
+    "quadruple_junctions": {
       "column": 11,
-      "expected": 23,
+      "expected": 2,
+      "abs_tolerance": 0
+    },
+    "branch_points": {
+      "column": 13,
+      "expected": 49,
       "abs_tolerance": 0
     },
     "total_length_of_branches": {
       "column": 14,
-      "expected": 292.70164895,
+      "expected": 331.89935592,
       "abs_tolerance": 0.0001
     },
     "achr_perimeter": {

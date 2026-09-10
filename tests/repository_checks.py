@@ -48,7 +48,6 @@ def main() -> None:
         'IJ.run(original.nerve, "Threshold...", "")',
         'IJ.run(original.nerve, "Despeckle", "")',
         'IJ.run(original.nerve, "Skeletonize", "")',
-        'IJ.run(original.nerve, "BinaryConnectivity ", "white")',
         'IJ.run(original.muscle, "Subtract Background...", "rolling=50 create")',
         'IJ.run(segment.muscle, "Find Maxima...", "noise=10 output=[Segmented Particles]")',
         'IJ.run(finalAverage, "Analyze Particles...", "display summarize")',
@@ -57,37 +56,31 @@ def main() -> None:
     ):
         require(marker in analysis, f"Direct ImageJ/Fiji operation changed or disappeared: {marker}")
 
-    require(
-        "AnisotropicSkeletonCalibration.effectivePixelSize(original.nerve)" in analysis,
-        "Branch-length workflow does not apply anisotropic skeleton calibration",
-    )
-    require(
-        "((double) width * height - counts0) * branchPixelSize" in analysis,
-        "Branch-length workflow no longer preserves the legacy skeleton-pixel-count estimator",
-    )
-    anisotropic_calibration = text(
-        "src/main/java/io/github/alzeiby/anmjmorphplus/AnisotropicSkeletonCalibration.java"
-    )
-    require(
-        "Double.compare(pixelWidth, pixelHeight) == 0" in anisotropic_calibration
-        and "return pixelWidth;" in anisotropic_calibration,
-        "Isotropic branch-length calibration must preserve the legacy pixel scale exactly",
-    )
-    require(
-        "horizontal * pixelWidth" in anisotropic_calibration
-        and "vertical * pixelHeight" in anisotropic_calibration
-        and "Math.hypot(pixelWidth, pixelHeight)" in anisotropic_calibration,
-        "Anisotropic branch-length calibration must use X/Y/diagonal skeleton orientation scaling",
-    )
+    require("AnalyzeSkeleton_" in analysis and "edge.getLength()" in analysis,
+            "Branch length is not measured from calibrated Analyze Skeleton graph edges")
+    require("vertex.getBranches().size() == 1" in analysis and
+            "getV1() != vertex.getBranches().get(0).getV2()" in analysis,
+            "Terminal branches must count degree-1 graph tips while excluding isolated pixels and self-loops")
+    require("sum(skeleton.getJunctions())" in analysis,
+            "Branch points must use Analyze Skeleton's grouped junction count")
+    require("BinaryConnectivity" not in production,
+            "Production still depends on Binary Connectivity")
+    require("AnisotropicSkeletonCalibration" not in production,
+            "Custom anisotropic skeleton implementation returned")
+    require("<artifactId>AnalyzeSkeleton_</artifactId>" in pom,
+            "Analyze Skeleton dependency is missing")
     require("setIm5D(false)" in analysis, "Overlap concatenation must not open as 4D")
     require("setIm5D(true)" in analysis, "Stage-6 concatenation must retain legacy 4D option")
     require("new BrushTool().run(\"\")" in analysis, "Paintbrush must use ImageJ BrushTool directly")
     require("Paintbrush Tool Options..." not in analysis, "Macro-only paintbrush command returned")
 
-    # The direct workflow owns the exact historical raw table shape/formulas.
+    # Keep the 29-column output shape while replacing obsolete connectivity diagnostics.
     require("CSV_HEADER_1" in analysis and "CSV_HEADER_2" in analysis, "CSV headers are not owned by Java")
-    for formula in ("=J", "=(K", "*0.28", "=LOG10(M", "=IF(AA"):
-        require(formula in analysis, f"Historical CSV formula missing: {formula}")
+    for marker in ("Skeleton Trees", "Terminal Tips", "Triple Junctions", "Quadruple Junctions"):
+        require(marker in analysis, f"Analyze Skeleton CSV diagnostic missing: {marker}")
+    require("*0.28" not in analysis, "Legacy branch-point heuristic is still active")
+    for formula in ("=J", "=O", "/M", "=LOG10(M", "=IF(AA"):
+        require(formula in analysis, f"CSV formula missing: {formula}")
 
     # Fresh-Fiji validation must execute Java directly with the legacy macro physically absent.
     require("legacy/aNMJ-morph macro.txt" in runtime, "Direct runtime no longer removes/asserts legacy resource absence")

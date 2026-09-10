@@ -13,7 +13,7 @@ DEFAULT_ANISOTROPIC_BASELINE = Path(__file__).resolve().parent / "nmj1_anisotrop
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Validate direct-Java analysis outputs against the unchanged NMJ_1 oracle"
+        description="Validate direct-Java analysis outputs against the pinned NMJ_1 oracle"
     )
     parser.add_argument("--work-dir", type=Path, required=True)
     parser.add_argument("--runs", type=int, default=2)
@@ -69,7 +69,7 @@ def main() -> None:
         numerical_baseline=anisotropic_baseline,
     )
     print(
-        "Direct-Java outputs passed unchanged isotropic NMJ_1 oracle, pinned anisotropic-Y2 oracle, "
+        "Direct-Java outputs passed Analyze Skeleton isotropic NMJ_1 oracle, pinned anisotropic-Y2 oracle, "
         "CSV/formula, Runs=2 append, rectangular, NaN, and cleaned-image checks"
     )
 

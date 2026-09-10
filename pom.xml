@@ -109,6 +109,10 @@
       <version>${bio-formats.version}</version>
     </dependency>
     <dependency>
+      <groupId>sc.fiji</groupId>
+      <artifactId>AnalyzeSkeleton_</artifactId>
+    </dependency>
+    <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <scope>test</scope>
