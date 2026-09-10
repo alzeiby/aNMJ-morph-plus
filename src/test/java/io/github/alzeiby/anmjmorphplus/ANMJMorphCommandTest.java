@@ -32,4 +32,25 @@ public class ANMJMorphCommandTest {
 
         assertEquals(Path.of(info.directory).resolve(image.getTitle()), ANMJMorphCommand.pathForCurrentImage(image));
     }
+
+    @Test
+    public void calibrationIsCanonicalizedToMicrons() {
+        final ImagePlus image = new ImagePlus("nm.tif", new ByteProcessor(4, 4));
+        image.getCalibration().pixelWidth = 250;
+        image.getCalibration().pixelHeight = 0.0005;
+        image.getCalibration().setUnit("nm");
+        image.getCalibration().setYUnit("mm");
+
+        AnalysisWorkflow.canonicalizeCalibration(image);
+
+        assertEquals(0.25, image.getCalibration().pixelWidth, 0.0);
+        assertEquals(0.5, image.getCalibration().pixelHeight, 0.0);
+        assertEquals("microns", image.getCalibration().getUnits());
+        assertEquals("microns", image.getCalibration().getYUnits());
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void uncalibratedPixelsAreRejected() {
+        AnalysisWorkflow.canonicalizeCalibration(new ImagePlus("pixels.tif", new ByteProcessor(4, 4)));
+    }
 }

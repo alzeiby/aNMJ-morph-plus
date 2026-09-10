@@ -9,6 +9,7 @@ import ij.WindowManager;
 import ij.gui.GenericDialog;
 import ij.gui.NonBlockingGenericDialog;
 import ij.gui.Toolbar;
+import ij.measure.Calibration;
 import ij.measure.Measurements;
 import ij.measure.ResultsTable;
 import ij.plugin.ChannelSplitter;
@@ -35,6 +36,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Locale;
 
 final class AnalysisWorkflow {
 
@@ -65,6 +67,7 @@ final class AnalysisWorkflow {
         final int muscleChannel,
         final int nerveChannel
     ) {
+        canonicalizeCalibration(image);
         final Path parent = inputPath.toAbsolutePath().normalize().getParent();
         final String name = inputPath.getFileName().toString();
         final int dot = name.lastIndexOf('.');
@@ -214,6 +217,35 @@ final class AnalysisWorkflow {
             quote("=IF(AA" + row + ",1-1/AA" + row + ",\"\")")
         };
         write(csv, String.join(",", fields) + "\n", StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+    }
+
+    static void canonicalizeCalibration(final ImagePlus image) {
+        final Calibration calibration = image.getCalibration();
+        calibration.pixelWidth = microns(calibration.pixelWidth, calibration.getXUnit());
+        calibration.pixelHeight = microns(calibration.pixelHeight, calibration.getYUnit());
+        calibration.setUnit("micron");
+        calibration.setYUnit("micron");
+    }
+
+    private static double microns(final double value, final String rawUnit) {
+        if (!(value > 0.0) || !Double.isFinite(value)) {
+            throw new IllegalArgumentException("Image pixel width and height must be finite and positive");
+        }
+        final String unit = rawUnit.toLowerCase(Locale.ROOT);
+        final double factor;
+        switch (unit) {
+            case "micron": case "microns": case "um": case "\u00b5m": case "\u03bcm": factor = 1.0; break;
+            case "nm": case "nanometer": case "nanometers": factor = 0.001; break;
+            case "\u00e5": case "angstrom": case "angstroms": factor = 0.0001; break;
+            case "mm": case "millimeter": case "millimeters": factor = 1000.0; break;
+            case "cm": case "centimeter": case "centimeters": factor = 10000.0; break;
+            case "m": case "meter": case "meters": factor = 1000000.0; break;
+            case "inch": case "inches": factor = 25400.0; break;
+            default: throw new IllegalArgumentException("Image calibration must use physical length units convertible to microns, not '" + rawUnit + "'");
+        }
+        final double converted = value * factor;
+        if (!Double.isFinite(converted)) throw new IllegalArgumentException("Image calibration is outside the supported range");
+        return converted;
     }
 
     static ImagePlus channel(final ImagePlus source, final int channel) {
