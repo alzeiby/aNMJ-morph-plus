@@ -352,9 +352,9 @@ final class AnalysisWorkflow {
     }
 
     private void installPaintbrush(final int width) {
+        Prefs.set("brush.width", width);
         new BrushTool().run("");
         paintbrushToolId = Toolbar.getToolId();
-        BrushTool.setBrushWidth(width);
     }
 
     private void selectPaintbrush() {
