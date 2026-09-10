@@ -183,19 +183,22 @@ public class StructuralNormalizerTest {
     }
 
     @Test
-    public void rgbZStackMaxMatchesImageJZProjectorComponentForComponent() {
+    public void rgbZStackConvertsToChannelsAndSelectedMaximaAreExact() {
         final ImagePlus actual = rgbZStack();
-        final ImagePlus referenceSource = rgbZStack();
-        final ImagePlus expected = ZProjector.run(referenceSource, "max");
-
         final ImagePlus normalized = ANMJMorphCommand.normalize(actual, false);
 
         assertNotSame(actual, normalized);
-        assertEquals(1, normalized.getNChannels());
-        assertEquals(1, normalized.getNSlices());
+        assertTrue(normalized instanceof CompositeImage);
+        assertEquals(3, normalized.getNChannels());
+        assertEquals(3, normalized.getNSlices());
         assertEquals(1, normalized.getNFrames());
-        assertEquals(expected.getProcessor().get(0, 0), normalized.getProcessor().get(0, 0));
-        assertEquals(expected.getProcessor().get(1, 0), normalized.getProcessor().get(1, 0));
+        final int[][] expected = {{64, 240}, {96, 224}, {112, 208}};
+        for (int channel = 1; channel <= 3; channel++) {
+            final ImagePlus selected = AnalysisWorkflow.channel(normalized, channel);
+            assertEquals(1, selected.getNSlices());
+            assertEquals(expected[channel - 1][0], selected.getProcessor().get(0, 0));
+            assertEquals(expected[channel - 1][1], selected.getProcessor().get(1, 0));
+        }
     }
 
     @Test
