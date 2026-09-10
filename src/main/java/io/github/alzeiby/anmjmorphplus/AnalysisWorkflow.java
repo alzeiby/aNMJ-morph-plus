@@ -2,6 +2,8 @@ package io.github.alzeiby.anmjmorphplus;
 
 import ij.IJ;
 import ij.ImagePlus;
+import ij.ImageStack;
+import ij.LookUpTable;
 import ij.Prefs;
 import ij.WindowManager;
 import ij.gui.GenericDialog;
@@ -9,7 +11,7 @@ import ij.gui.NonBlockingGenericDialog;
 import ij.gui.Toolbar;
 import ij.measure.Measurements;
 import ij.measure.ResultsTable;
-import ij.plugin.Duplicator;
+import ij.plugin.ChannelSplitter;
 import ij.plugin.ZProjector;
 import ij.plugin.filter.Analyzer;
 import ij.plugin.filter.BackgroundSubtracter;
@@ -76,7 +78,6 @@ final class AnalysisWorkflow {
         }
         final Path axonPath = cleaned.resolve("axon_terminal" + stem + ".tif");
         final Path endplatePath = cleaned.resolve("muscle_endplate" + stem + ".tif");
-        final Path intermediatePath = cleaned.resolve("muscle_intermediate_endplate" + stem + ".tif");
         final int width = image.getWidth();
         final int height = image.getHeight();
         final double pixelSizeX = image.getCalibration().pixelWidth;
@@ -103,7 +104,7 @@ final class AnalysisWorkflow {
         makeCurrent(nerve);
         IJ.run(nerve, "Threshold...", "");
         prompter.review(nerve, SCREEN2);
-        final String thresholdNerve = ThresholdAdjuster.getMethod();
+        final String thresholdNerve = threshold(nerve);
         Prefs.blackBackground = false;
         IJ.run(nerve, "Make Binary", "thresholded remaining black");
         new RankFilters().rank(nerve.getProcessor(), 1.0, RankFilters.MEDIAN);
@@ -117,7 +118,7 @@ final class AnalysisWorkflow {
         makeCurrent(muscle);
         IJ.run(muscle, "Threshold...", "");
         prompter.review(muscle, SCREEN3);
-        final String thresholdEndplate = ThresholdAdjuster.getMethod();
+        final String thresholdEndplate = threshold(muscle);
         IJ.run(muscle, "Make Binary", "thresholded remaining black");
         new RankFilters().rank(muscle.getProcessor(), 1.0, RankFilters.MEDIAN);
         closeThreshold();
@@ -145,7 +146,6 @@ final class AnalysisWorkflow {
         final double[] nerveMeasurement = measure(nerve);
 
         IJ.run(nerve, "Make Binary", "thresholded remaining black");
-        IJ.run(nerve, "Convert to Mask", "");
         IJ.run(nerve, "Skeletonize", "");
         final AnalyzeSkeleton_ analyzer = new AnalyzeSkeleton_();
         analyzer.setup("", nerve);
@@ -166,7 +166,6 @@ final class AnalysisWorkflow {
 
         selectForeground(muscle);
         final double[] achrMeasurement = measure(muscle);
-        makeCurrent(muscle);
         new BackgroundSubtracter().rollingBallBackground(
             muscle.getProcessor(), 50, true, false, false, true, true
         );
@@ -174,13 +173,11 @@ final class AnalysisWorkflow {
         IJ.run(intermediate, "Make Binary", "thresholded remaining black");
         selectForeground(intermediate);
         final double[] endplateMeasurement = measure(intermediate);
-        IJ.saveAs(intermediate, "Tiff", intermediatePath.toString());
 
         IJ.run(segmentMuscle, "Make Binary", "");
-        final ImageProcessor maximaInput = segmentMuscle.getProcessor().duplicate();
-        if (segmentMuscle.isInvertedLut()) maximaInput.invert();
+        if (segmentMuscle.isInvertedLut()) segmentMuscle.getProcessor().invert();
         final ImageProcessor segmentedProcessor = new MaximumFinder().findMaxima(
-            maximaInput, 10, false, ImageProcessor.NO_THRESHOLD,
+            segmentMuscle.getProcessor(), 10, false, ImageProcessor.NO_THRESHOLD,
             MaximumFinder.SEGMENTED, false, false);
         if (segmentedProcessor == null) throw new IllegalStateException("Find Maxima did not create a segmented image");
         if (!Prefs.blackBackground) segmentedProcessor.invertLut();
@@ -203,7 +200,7 @@ final class AnalysisWorkflow {
         final String[] fields = {
             quote(width + " x " + height),
             quote(format(pixelSizeX * width) + " x " + format(pixelSizeY * height) + sizeUnit),
-            inputPath.getFileName().toString(), thresholdNerve + "/" + thresholdEndplate, "",
+            quote(inputPath.getFileName().toString()), thresholdNerve + "/" + thresholdEndplate, "",
             Double.isNaN(axonDiameter) ? "" : format(axonDiameter),
             format(nerveMeasurement[1]), format(nerveMeasurement[0]), format(skeleton.getNumOfTrees()), format(terminalBranches),
             format(tripleJunctions), format(quadrupleJunctions), quote("=J" + row), format(branchPoints),
@@ -219,13 +216,16 @@ final class AnalysisWorkflow {
     }
 
     static ImagePlus channel(final ImagePlus source, final int channel) {
-        source.deleteRoi();
-        final ImagePlus copy = new Duplicator().run(
-            source, channel, channel, 1, source.getNSlices(), 1, 1
-        );
-        if (copy.getNSlices() == 1) return copy;
-        final double displayMin = copy.getDisplayRangeMin();
-        final double displayMax = copy.getDisplayRangeMax();
+        source.setC(channel);
+        final double displayMin = source.getDisplayRangeMin(), displayMax = source.getDisplayRangeMax();
+        final ImageStack stack = ChannelSplitter.getChannel(source, channel);
+        stack.setColorModel(LookUpTable.createGrayscaleColorModel(source.isInvertedLut()));
+        final ImagePlus copy = source.createImagePlus();
+        copy.setStack("C" + channel + "-" + source.getTitle(), stack);
+        if (copy.getNSlices() == 1) {
+            copy.setDisplayRange(displayMin, displayMax);
+            return copy;
+        }
         final ImagePlus projected = ZProjector.run(copy, "max");
         projected.setDisplayRange(displayMin, displayMax);
         copy.flush();
@@ -233,18 +233,19 @@ final class AnalysisWorkflow {
     }
 
     private static double unoccupiedArea(final ImagePlus achr, final ImagePlus nerve) {
-        final int pixels = achr.getProcessor().getPixelCount();
+        final ImageProcessor achrProcessor = achr.getProcessor();
+        final ImageProcessor nerveProcessor = nerve.getProcessor();
+        final int pixels = achrProcessor.getPixelCount();
         int unoccupied = 0;
         for (int i = 0; i < pixels; i++) {
-            if (achr.getProcessor().get(i) == 0 && nerve.getProcessor().get(i) != 0) unoccupied++;
+            if (achrProcessor.get(i) == 0 && nerveProcessor.get(i) != 0) unoccupied++;
         }
         return unoccupied * achr.getCalibration().pixelWidth * achr.getCalibration().pixelHeight;
     }
 
     private static double[] measure(final ImagePlus image) {
         final ResultsTable table = new ResultsTable();
-        new Analyzer(image, Measurements.AREA | Measurements.MEAN | Measurements.MIN_MAX |
-            Measurements.PERIMETER | Measurements.FERET, table).measure();
+        new Analyzer(image, Measurements.AREA | Measurements.PERIMETER | Measurements.FERET, table).measure();
         return new double[] {
             table.getValue("Area", 0),
             table.getValue("Perim.", 0),
@@ -285,6 +286,13 @@ final class AnalysisWorkflow {
 
     private static String format(final double value) {
         return IJ.d2s(value, 8);
+    }
+
+    private static String threshold(final ImagePlus image) {
+        final ImageProcessor processor = image.getProcessor();
+        if (!processor.isThreshold()) return ThresholdAdjuster.getMethod() + "[none]";
+        return ThresholdAdjuster.getMethod() + "[" + format(processor.getMinThreshold()) + "-" +
+            format(processor.getMaxThreshold()) + "]";
     }
 
     private static String quote(final String value) {

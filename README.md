@@ -11,7 +11,7 @@ This fork preserves the original seven-step workflow as a Java/SciJava Fiji plug
 - Prompts before interpreting ambiguous one-channel/two-plane images as Keyence-style channel exports.
 - Rejects time series (`T > 1`) instead of silently analyzing one frame.
 - Supports interactive batch processing across common microscopy and image formats.
-- Includes CI checks, release packaging, citation metadata, and retained reference material.
+- Includes CI checks, release packaging, citation metadata, and a pinned scientific regression fixture.
 
 ## Requirements
 
@@ -29,7 +29,7 @@ The analysis runtime is implemented as a Java/SciJava Fiji plugin. The command i
 
 Developers can also install a build directly with `mvn -Dscijava.app.directory=/path/to/Fiji.app/`.
 
-The root `aNMJ-morph macro.txt` remains in the repository as a historical/scientific parity reference. It is not packaged into the plugin JAR and is not invoked at runtime.
+The plugin is implemented entirely in Java. Historical IJM versions remain available through Git history and the original dataset citation below; they are not part of the current source or runtime.
 
 Java owns single-image selection, batch traversal/session orchestration, supported-format routing, loading, structural normalization, interactive review, measurements, segmentation, cleaned-image output, and the 29-column CSV. RGB conversion, Z projection, channel arrangement/splitting, thresholding, morphology operations, particle analysis, and related processing use Fiji/ImageJ implementations directly. TIFF inputs use ImageJ directly; microscopy formats that require it use Bio-Formats.
 
@@ -74,9 +74,11 @@ The analysis image, threshold-reference copy, and segmentation copy all use the 
 The plugin writes:
 
 - `raw_data_table.csv` — quantitative measurements and derived spreadsheet formulas.
-- `cleaned_images/` — thresholded/intermediate TIFF images used by the workflow.
+- `cleaned_images/` — the cleaned nerve-terminal and muscle-endplate TIFF images.
 
-The repository also retains the original tutorial video, 20 reference NMJ images, and the reference spreadsheet distributed with the Edinburgh DataShare dataset [3].
+The threshold column records both the selected ImageJ threshold method and the accepted numeric bounds, so manual slider adjustments remain reproducible in the saved metadata.
+
+The original tutorial video, spreadsheet, and full reference-image set remain available from the Edinburgh DataShare dataset [3] and Git history. The repository keeps only `NMJ_1.lsm` under `src/test/resources/` for the pinned scientific regression oracle.
 
 ### Branch analysis and rectangular-image compatibility
 
@@ -110,9 +112,9 @@ Original method and supporting references:
 
 ## Development
 
-GitHub Actions checks the repository on pushes and pull requests, including the rectangular-image formula, dimensionality guards, channel ordering, TIFF batch support, output naming, bundled reference images, licensing attribution, citation metadata, Java packaging, and the pinned fresh-Fiji numerical oracle.
+GitHub Actions runs the Java test suite, release-package smoke checks, and the pinned fresh-Fiji numerical oracle on the retained NMJ_1 reference fixture.
 
-Tags matching `v*` validate the repository and build a release archive containing the installable Java plugin JAR, README, `LICENSE`, `CITATION.cff`, reference spreadsheet, reference images, and a SHA-256 checksum. The historical IJM reference remains in the source repository rather than the runtime release package.
+Tags matching `v*` validate the repository and build a release archive containing only the installable Java plugin JAR, README, `LICENSE`, `CITATION.cff`, and a SHA-256 checksum.
 
 ## License
 
