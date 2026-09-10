@@ -13,7 +13,7 @@
 
   <groupId>io.github.alzeiby</groupId>
   <artifactId>anmj-morph-plus</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>0.1.0</version>
 
   <name>aNMJ-morph+</name>
   <description>Fiji plugin for quantitative neuromuscular junction morphology analysis.</description>
@@ -27,8 +27,8 @@
 
   <licenses>
     <license>
-      <name>Creative Commons Attribution 4.0 International</name>
-      <url>https://creativecommons.org/licenses/by/4.0/</url>
+      <name>MIT License</name>
+      <url>https://opensource.org/license/mit</url>
       <distribution>repo</distribution>
     </license>
   </licenses>
@@ -82,8 +82,8 @@
 
   <properties>
     <package-name>io.github.alzeiby.anmjmorphplus</package-name>
-    <license.licenseName>cc-by-4.0</license.licenseName>
-    <license.copyrightOwners>Abdullah Alzeiby and the original aNMJ-morph authors</license.copyrightOwners>
+    <license.licenseName>mit</license.licenseName>
+    <license.copyrightOwners>Abdullah Alzeiby</license.copyrightOwners>
     <bio-formats.version>8.5.0</bio-formats.version>
   </properties>
 

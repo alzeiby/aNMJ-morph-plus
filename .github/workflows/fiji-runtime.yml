@@ -1,6 +1,7 @@
 name: Fiji runtime
 
 on:
+  workflow_call:
   pull_request:
     paths:
       - "src/**"
@@ -47,6 +48,22 @@ jobs:
           7z x -y "$archive" "-o$extract" >/dev/null
           [[ -f "$extract/Fiji/fiji-windows-x64.exe" ]]
           echo "FIJI_ROOT=$extract/Fiji" >> "$GITHUB_ENV"
+
+      - name: Fetch pinned scientific reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp="${RUNNER_TEMP//\\//}"
+          archive="$temp/reference-images.zip"
+          reference="$temp/NMJ_1.lsm"
+          curl -L --fail --retry 3 \
+            https://datashare.ed.ac.uk/server/api/core/bitstreams/a861dbc1-a70c-4cdb-8725-1d43012921e6/content \
+            -o "$archive"
+          echo "2e2493085cb4aca8b04a16df38ae996ce72dc8d31e622b0f2a68fdf8a92c1555 *$archive" | sha256sum -c -
+          rm -f "$reference"
+          7z e -y "$archive" "Reference Images/NMJ_1.lsm" "-o$temp" >/dev/null
+          echo "b60dcedcd7509183e61a5301110f114fdaf366348f8297cae96608d6c902e0c2 *$reference" | sha256sum -c -
+          echo "NMJ_REFERENCE=$reference" >> "$GITHUB_ENV"
 
       - name: Run Java-only scientific oracle against pinned Fiji
         shell: bash
@@ -978,7 +995,7 @@ jobs:
             "$(winpath "$oracle")"
           "$java_bin" -Dplugins.dir="$fiji_win" -Djava.awt.headless=false -cp "$cp" \
             io.github.alzeiby.anmjmorphplus.FreshFijiRuntime \
-            "$(winpath "src/test/resources/NMJ_1.lsm")" "$(winpath "$work")" 2
+            "$(winpath "$NMJ_REFERENCE")" "$(winpath "$work")" 2
 
       - name: Upload outputs on failure
         if: failure()
