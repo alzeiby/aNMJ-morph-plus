@@ -5,7 +5,7 @@
     "source_sha256": "b60dcedcd7509183e61a5301110f114fdaf366348f8297cae96608d6c902e0c2",
     "transform": "after loading, set pixelHeight = 2 * pixelWidth; pixel data unchanged",
     "pixel_height_multiplier": 2.0,
-    "method": "legacy skeleton-pixel count calibrated independently per 8-connected component by orientation-weighted XY skeleton scale"
+    "method": "Fiji Analyze Skeleton 3.4.2 calibrated graph-edge length and topology"
   },
   "exact_fields": {
     "image_dimensions_pixels": {
@@ -41,29 +41,34 @@
       "expected": 905.15779629,
       "abs_tolerance": 0.0001
     },
-    "connectivity_background_pixels": {
+    "skeleton_trees": {
       "column": 8,
-      "expected": 259923,
+      "expected": 32,
       "abs_tolerance": 0
     },
-    "connectivity_terminal_pixels": {
+    "terminal_tips": {
       "column": 9,
       "expected": 99,
       "abs_tolerance": 0
     },
-    "connectivity_three_point_pixels": {
+    "triple_junctions": {
       "column": 10,
-      "expected": 139,
+      "expected": 47,
       "abs_tolerance": 0
     },
-    "connectivity_four_point_pixels": {
+    "quadruple_junctions": {
       "column": 11,
-      "expected": 23,
+      "expected": 2,
+      "abs_tolerance": 0
+    },
+    "branch_points": {
+      "column": 13,
+      "expected": 49,
       "abs_tolerance": 0
     },
     "total_length_of_branches": {
       "column": 14,
-      "expected": 465.87764012,
+      "expected": 527.80095379,
       "abs_tolerance": 0.0001
     },
     "achr_perimeter": {

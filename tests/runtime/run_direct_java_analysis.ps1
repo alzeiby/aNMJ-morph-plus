@@ -137,4 +137,4 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Direct-Java output validation failed.'
 }
 
-Write-Output "aNMJ-morph+ direct-Java fresh-Fiji analysis passed ($Runs square + $Runs rectangular + $Runs anisotropic, unchanged isotropic NMJ_1 oracle, no legacy macro resource)."
+Write-Output "aNMJ-morph+ direct-Java fresh-Fiji analysis passed ($Runs square + $Runs rectangular + $Runs anisotropic, Analyze Skeleton branch oracle, no legacy macro resource)."
