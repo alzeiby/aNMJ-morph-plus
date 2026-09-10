@@ -19,30 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-Upstream attribution and license notice
----------------------------------------
-
-The MIT License above applies to the aNMJ-morph+ Java implementation and other
-original contributions authored by Abdullah Alzeiby, to the extent he holds
-copyright in those contributions. It does not relicense original aNMJ-morph
-material.
-
-The aNMJ-morph+ workflow is adapted from aNMJ-morph by Gavin Minty, Alex
-Hoppen, Ines Boehm, Abrar Alhindi, Larissa Gibb, Ellie Potter, Boris Wagner,
-Janice Miller, Richard Skipworth, Tom Gillingwater, Ross Jones, and colleagues.
-The original material is distributed by the University of Edinburgh through
-Edinburgh DataShare under Creative Commons Attribution 4.0 International
-(CC BY 4.0):
-
-https://doi.org/10.7488/ds/2625
-https://creativecommons.org/licenses/by/4.0/
-
-CC BY 4.0 continues to govern the original licensed material contained in or
-adapted by this project. When using or redistributing material subject to that
-license, preserve the required attribution, license notice, source link, and
-indication of modifications. No endorsement by the original creators, the
-University of Edinburgh, Abdullah Alzeiby, or Creative Commons is implied.
-
-Third-party dependencies are not covered by this MIT grant and retain their
-respective licenses and notices.
