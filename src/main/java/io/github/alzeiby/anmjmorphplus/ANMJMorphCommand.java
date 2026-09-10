@@ -114,7 +114,7 @@ public class ANMJMorphCommand implements Command {
         final Path parent = relative.getParent();
         return parent != null && StreamSupport.stream(parent.spliterator(), false)
             .map(part -> part.toString().toLowerCase(Locale.ROOT))
-            .anyMatch(name -> name.contains("cleaned_images") || name.equals(".anmj-morph-plus"));
+            .anyMatch(name -> name.equals("cleaned_images") || name.equals(".anmj-morph-plus"));
     }
 
     static ImagePlus load(final Path path) {

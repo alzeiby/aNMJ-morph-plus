@@ -1,5 +1,2 @@
-/tests/runtime/_work/
-__pycache__/
-*.pyc
 target/
 dist/
