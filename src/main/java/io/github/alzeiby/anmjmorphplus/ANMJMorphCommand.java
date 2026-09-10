@@ -120,25 +120,19 @@ public class ANMJMorphCommand implements Command {
 
     static ImagePlus load(final Path path) {
         final String name = path.getFileName().toString();
-        final String lower = name.toLowerCase(Locale.ROOT);
         if (!supported(path)) throw new IllegalArgumentException("Unsupported image format: " + name);
         final String absolute = path.toAbsolutePath().normalize().toString();
-        ImagePlus image = null;
         try {
-            if (lower.matches(".*\\.(tif|tiff|png|jpe?g|bmp)$")) {
-                image = IJ.openImage(absolute);
+            final ImagePlus[] images = BF.openImagePlus(absolute);
+            if (images == null || images.length != 1 || images[0] == null) {
+                if (images != null) for (ImagePlus opened : images) if (opened != null) opened.close();
+                throw new IllegalStateException("Expected exactly one image series: " + name);
             }
-            if (image == null) {
-                final ImagePlus[] images = BF.openImagePlus(absolute);
-                if (images != null && images.length == 1) image = images[0];
-                else if (images != null) for (ImagePlus opened : images) if (opened != null) opened.close();
-            }
+            images[0].setTitle(name);
+            return images[0];
         } catch (FormatException | IOException e) {
             throw new IllegalStateException("Could not open image: " + name, e);
         }
-        if (image == null) throw new IllegalStateException("Could not open image: " + name);
-        image.setTitle(name);
-        return image;
     }
 
     static ImagePlus normalize(final ImagePlus image, final boolean twoPlanesAsChannels) {
