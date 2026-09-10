@@ -31,7 +31,7 @@ Developers can also install a build directly with `mvn -Dscijava.app.directory=/
 
 The plugin is implemented entirely in Java. Historical IJM versions remain available through Git history and the original dataset citation below; they are not part of the current source or runtime.
 
-Java owns single-image selection, batch traversal/session orchestration, supported-format routing, loading, structural normalization, interactive review, measurements, segmentation, cleaned-image output, and the 29-column CSV. RGB conversion, Z projection, channel arrangement/splitting, thresholding, morphology operations, particle analysis, and related processing use Fiji/ImageJ implementations directly. TIFF inputs use ImageJ directly; microscopy formats that require it use Bio-Formats.
+Java owns single-image selection, batch traversal/session orchestration, supported-format routing, loading, structural normalization, interactive review, measurements, segmentation, cleaned-image output, and the 29-column CSV. RGB conversion, Z projection, channel arrangement/splitting, thresholding, morphology operations, particle analysis, and related processing use Fiji/ImageJ implementations directly. Supported files are loaded through Bio-Formats for one consistent metadata-aware path.
 
 ## Usage
 
@@ -55,7 +55,7 @@ Supported extensions:
 
 `.tif`, `.tiff`, `.lsm`, `.nd2`, `.czi`, `.lif`, `.png`, `.jpg`, `.jpeg`, `.bmp`
 
-TIFF files are opened directly with ImageJ; microscopy formats that require it are opened through Bio-Formats.
+All supported files are opened through Bio-Formats.
 
 ## Input handling
 
