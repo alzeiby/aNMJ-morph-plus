@@ -45,6 +45,8 @@ Then:
 2. Select the muscle-endplate and nerve-terminal channels.
 3. Follow the seven on-screen steps for thresholding, axon measurement/cleanup, segmentation review, and output.
 
+Each image starts its first Threshold window from a deterministic ImageJ `Default` dark-background baseline (red threshold display, 8-bit histogram mode). You can adjust the method and bounds interactively; the muscle threshold then inherits any within-image choices made during the nerve-threshold step.
+
 ### Batch mode
 
 Run **Analyze > Tools > aNMJ-morph+** with **no image open**, choose **Batch folder**, and select the directory. Java searches recursively, skips generated `cleaned_images` directories, and processes supported images one at a time. A file error is logged and the batch continues; cancelling an interactive step stops the batch.
@@ -113,7 +115,7 @@ Original method and supporting references:
 
 ## Development
 
-GitHub Actions runs the Java test suite, release-package smoke checks, and the pinned fresh-Fiji numerical oracle on the retained NMJ_1 reference fixture.
+GitHub Actions runs the Maven/build checks, release-package smoke checks, and a workflow-generated Java oracle against pinned Fiji and the retained NMJ_1 reference fixture. No Java test sources are tracked in the repository.
 
 Tags matching `v*` validate the repository and build a release archive containing only the installable Java plugin JAR, README, `LICENSE`, `CITATION.cff`, and a SHA-256 checksum.
 

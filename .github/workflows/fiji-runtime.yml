@@ -5,7 +5,6 @@ on:
     paths:
       - "src/**"
       - "pom.xml"
-      - "src/test/resources/NMJ_1.lsm"
       - ".github/workflows/fiji-runtime.yml"
   workflow_dispatch:
 
@@ -71,8 +70,912 @@ jobs:
           while IFS= read -r dir; do cp="$cp;$(winpath "$dir")/*"; done \
             < <(find "$FIJI_ROOT/plugins" -type f -name '*.jar' -printf '%h\n' | sort -u)
 
+          oracle="$work/FreshFijiRuntime.java"
+          cat > "$oracle" <<'JAVA'
+          package io.github.alzeiby.anmjmorphplus;
+
+          import ij.IJ;
+          import ij.CompositeImage;
+          import ij.ImageJ;
+          import ij.ImagePlus;
+          import ij.ImageStack;
+          import ij.WindowManager;
+          import ij.gui.Line;
+          import ij.gui.Roi;
+          import ij.gui.Toolbar;
+          import ij.io.FileInfo;
+          import ij.measure.Calibration;
+          import ij.plugin.ZProjector;
+          import ij.plugin.frame.ThresholdAdjuster;
+          import ij.plugin.tool.BrushTool;
+          import ij.process.ByteProcessor;
+          import ij.process.ColorProcessor;
+          import ij.process.FloatProcessor;
+          import ij.process.ImageProcessor;
+          import ij.process.ShortProcessor;
+          import org.scijava.Context;
+          import org.scijava.command.CommandInfo;
+          import org.scijava.command.CommandService;
+          import org.scijava.plugin.PluginService;
+
+          import java.io.IOException;
+          import java.nio.charset.StandardCharsets;
+          import java.nio.file.Files;
+          import java.nio.file.Path;
+          import java.nio.file.StandardCopyOption;
+          import java.security.MessageDigest;
+          import java.security.NoSuchAlgorithmException;
+          import java.util.ArrayList;
+          import java.util.HashSet;
+          import java.util.List;
+          import java.util.Set;
+
+          /**
+           * Fresh-Fiji direct-Java scientific runtime oracle.
+           *
+           * <p>This harness deliberately lives in the production package so it can use the package-private
+           * AnalysisWorkflow ReviewPrompter seam without adding any production-only test API. It never runs,
+           * reads, or transforms the legacy IJM resource.</p>
+           */
+          public final class FreshFijiRuntime {
+
+              private static final int RECT_WIDTH = 384;
+              private static final int RECT_HEIGHT = 512;
+              private static final String REFERENCE_SHA256 =
+                  "b60dcedcd7509183e61a5301110f114fdaf366348f8297cae96608d6c902e0c2";
+              private static final String HEADER_1 =
+                  "IMAGE DETAILS (frame size),,NMJ,THRESHOLD,PRE-SYNAPTIC,,,,Branch analysis,,,,,,,,,POST-SYNAPTIC";
+              private static final String HEADER_2 =
+                  "\"Number of pixels (eg, 512 x 512)\",\"Metric (eg, 67.48 x 67.48um)\",\"Ref number\",\"(nerve terminal/motor endplate)\",\"Number of Axonal Inputs\",\"Axon Diameter (um)\",\"Nerve Terminal Perimeter (um)\",\"Nerve Terminal Area (um2)\",\"Skeleton Trees\",\"Terminal Tips\",\"Triple Junctions\",\"Quadruple Junctions\",\" Number of Terminal Branches\",\"Number of Branch Points\",\"Total Length of Branches (um)\",\"Average Length of Branches (um)\",\"\"\"Complexity\"\"\",\"AChR Perimeter (um)\",\"AChR Area (um2)\",\"Endplate Diameter (um)\",\"Endplate Perimeter (um)\",\"Endplate Area (um2)\",\"\"\"Compactness\"\" (%)\",\"Unoccupied AChR Area (um2)\",\"\"\"Area of Synaptic Contact\"\" (um2)\",\"\"\"Overlap\"\" (%)\",\"Number of AChR Clusters\",\"Average Area of AChR Clusters (um2)\",\"\"\"Fragmentation\"\"\"";
+
+              private FreshFijiRuntime() {
+              }
+
+              public static void main(final String[] args) {
+                  try {
+                      if (args.length != 3) {
+                          throw new IllegalArgumentException(
+                              "Expected: <NMJ_1.lsm> <work-directory> <runs>"
+                          );
+                      }
+                      final Path reference = Path.of(args[0]).toAbsolutePath().normalize();
+                      final Path work = Path.of(args[1]).toAbsolutePath().normalize();
+                      final int runs = Integer.parseInt(args[2]);
+                      if (runs < 1) {
+                          throw new IllegalArgumentException("runs must be >= 1");
+                      }
+                      run(reference, work, runs);
+                      System.out.println("Fresh Fiji runtime passed");
+                      System.exit(0);
+                  } catch (Throwable error) {
+                      error.printStackTrace(System.err);
+                      System.exit(1);
+                  }
+              }
+
+              private static void run(final Path reference, final Path work, final int runs) throws IOException {
+                  if (!Files.isRegularFile(reference)) {
+                      throw new IllegalArgumentException("Missing NMJ_1 reference: " + reference);
+                  }
+                  require(REFERENCE_SHA256.equals(sha256(reference)), "NMJ_1 reference hash changed");
+                  require(
+                      FreshFijiRuntime.class.getResource("/legacy/aNMJ-morph macro.txt") == null,
+                      "Legacy macro resource must not be packaged"
+                  );
+                  verifyPluginDiscovery();
+                  verifyNormalizationScience();
+
+                  Files.createDirectories(work);
+                  final Path squareDir = work.resolve("square");
+                  final Path rectangularDir = work.resolve("rectangular");
+                  final Path anisotropicDir = work.resolve("anisotropic");
+                  final Path squareInputDir = squareDir.resolve("input");
+                  final Path rectangularInputDir = rectangularDir.resolve("input");
+                  final Path anisotropicInputDir = anisotropicDir.resolve("input");
+                  Files.createDirectories(squareInputDir);
+                  Files.createDirectories(rectangularInputDir);
+                  Files.createDirectories(anisotropicInputDir);
+
+                  final Path squareInput = squareInputDir.resolve("NMJ_1.lsm");
+                  Files.copy(reference, squareInput, StandardCopyOption.REPLACE_EXISTING);
+
+                  final ImageJ imageJ = new ImageJ(ImageJ.NO_SHOW);
+                  try {
+                      verifyChannelSelectionScience();
+                      verifyGlobalCalibrationIsolation(reference);
+                      verifyThresholdBaseline(squareInput);
+                      verifyCancellationCleanup(squareInput, "2/7 Threshold Nerve terminal.");
+                      verifyCancellationCleanup(squareInput, "Screen 6/7 Check segmented image.");
+                      final Path rectangularInput = rectangularInputDir.resolve("NMJ_1_rect_384x512.tif");
+                      createRectangularFixture(reference, rectangularInput);
+                      final Path anisotropicInput = anisotropicInputDir.resolve("NMJ_1_aniso_y2.lsm");
+                      Files.copy(reference, anisotropicInput, StandardCopyOption.REPLACE_EXISTING);
+
+                      final DeterministicReviewPrompter squarePrompter = new DeterministicReviewPrompter();
+                      for (int run = 1; run <= runs; run++) {
+                          analyzeOne(squareInput, squarePrompter, false);
+                      }
+
+                      final DeterministicReviewPrompter rectangularPrompter = new DeterministicReviewPrompter();
+                      for (int run = 1; run <= runs; run++) {
+                          analyzeOne(rectangularInput, rectangularPrompter, false);
+                      }
+
+                      final DeterministicReviewPrompter anisotropicPrompter = new DeterministicReviewPrompter();
+                      for (int run = 1; run <= runs; run++) {
+                          analyzeOne(anisotropicInput, anisotropicPrompter, true);
+                      }
+
+                      validateCase(squareDir, "512 x 512", "NMJ_1.lsm", runs, false);
+                      validateCase(rectangularDir, "384 x 512", "NMJ_1_rect_384x512.tif", runs, false);
+                      validateCase(anisotropicDir, "512 x 512", "NMJ_1_aniso_y2.lsm", runs, true);
+                  } finally {
+                      closeAllImages();
+                      imageJ.dispose();
+                  }
+              }
+
+              private static void verifyPluginDiscovery() throws IOException {
+                  try (Context context = new Context(PluginService.class, CommandService.class)) {
+                      context.service(PluginService.class).reloadPlugins();
+                      final CommandInfo command = context.service(CommandService.class)
+                          .getCommand("io.github.alzeiby.anmjmorphplus.ANMJMorphCommand");
+                      require(command != null, "aNMJ-morph+ command was not discovered");
+                      require("Analyze > Tools > aNMJ-morph+".equals(command.getMenuPath().getMenuString()),
+                          "Unexpected plugin menu path");
+                      try {
+                          Class.forName("io.github.alzeiby.anmjmorphplus.LegacyMacroRunner");
+                          throw new IllegalStateException("LegacyMacroRunner is still packaged");
+                      } catch (ClassNotFoundException expected) {
+                          // Expected: the Java plugin is self-contained.
+                      }
+                  }
+              }
+
+              private static void verifyChannelSelectionScience() {
+                  verifySelectedChannels(3, 3, 1, 33, 11);
+                  verifySelectedChannels(10, 10, 3, 110, 33);
+                  verifySelectedChannelsIgnoreAreaRoi();
+              }
+
+              private static void verifyGlobalCalibrationIsolation(final Path reference) {
+                  final ImagePlus calibrationScope = new ImagePlus();
+                  final Calibration previous = calibrationScope.getGlobalCalibration();
+                  ImagePlus image = null;
+                  try {
+                      calibrationScope.setGlobalCalibration(null);
+                      final ImagePlus baseline = ANMJMorphCommand.load(reference);
+                      final double expected = baseline.getLocalCalibration().pixelWidth;
+                      baseline.close();
+
+                      final Calibration bogus = new Calibration();
+                      bogus.pixelWidth = 99.0;
+                      bogus.pixelHeight = 77.0;
+                      bogus.setUnit("mm");
+                      calibrationScope.setGlobalCalibration(bogus);
+
+                      image = ANMJMorphCommand.load(reference);
+                      require(Double.compare(image.getLocalCalibration().pixelWidth, expected) == 0,
+                          "Global Calibration changed Bio-Formats file calibration");
+                      require(Double.compare(calibrationScope.getGlobalCalibration().pixelWidth, 99.0) == 0,
+                          "Bio-Formats load did not restore Global Calibration");
+                      image = ANMJMorphCommand.normalize(image, false);
+                      AnalysisWorkflow.canonicalizeCalibration(image);
+                      require(Double.compare(image.getCalibration().pixelWidth, expected) == 0,
+                          "Global Calibration overrode analysis calibration");
+                  } finally {
+                      if (image != null) image.close();
+                      calibrationScope.setGlobalCalibration(previous);
+                  }
+              }
+
+              private static void verifyCancellationCleanup(final Path input, final String cancelAt) {
+                  final Set<Integer> existing = imageIds();
+                  final boolean blackBackground = ij.Prefs.blackBackground;
+                  try {
+                      ij.Prefs.blackBackground = true;
+                      ImagePlus image = ANMJMorphCommand.load(input);
+                      final ImagePlus normalized = ANMJMorphCommand.normalize(image, false);
+                      if (normalized != image) {
+                          image.close();
+                          image = normalized;
+                      }
+                      image.show();
+                      new AnalysisWorkflow(new DeterministicReviewPrompter(cancelAt)).analyze(image, input, 1, 2);
+                      throw new IllegalStateException("Expected cancellation at " + cancelAt);
+                  } catch (ANMJMorphCommand.Cancelled expected) {
+                      // Expected.
+                  }
+                  final Set<Integer> leaked = imageIds();
+                  leaked.removeAll(existing);
+                  closeImagesCreatedAfter(existing);
+                  require(leaked.isEmpty(), "Cancellation leaked plugin-owned image windows at " + cancelAt);
+                  require(WindowManager.getWindow("Threshold") == null, "Cancellation leaked Threshold window at " + cancelAt);
+                  require(ij.Prefs.blackBackground, "Cancellation did not restore BlackBackground");
+                  ij.Prefs.blackBackground = blackBackground;
+              }
+
+              private static void verifyThresholdBaseline(final Path input) {
+                  final Set<Integer> existing = imageIds();
+                  try {
+                      ThresholdAdjuster.setMethod("Otsu");
+                      ij.Prefs.set(ThresholdAdjuster.MODE_KEY, 2);
+                      ij.Prefs.set(ThresholdAdjuster.DARK_BACKGROUND, false);
+                      ij.Prefs.set(ThresholdAdjuster.NO_RESET, false);
+                      ij.Prefs.set(ThresholdAdjuster.SIXTEEN_BIT, true);
+                      final ImagePlus contaminated = new ImagePlus("contaminated-threshold", new ByteProcessor(8, 8));
+                      contaminated.show();
+                      IJ.run(contaminated, "Threshold...", "");
+                      require(WindowManager.getWindow("Threshold") != null, "Threshold contamination setup failed");
+
+                      ImagePlus image = ANMJMorphCommand.load(input);
+                      final ImagePlus normalized = ANMJMorphCommand.normalize(image, false);
+                      if (normalized != image) {
+                          image.close();
+                          image = normalized;
+                      }
+                      image.show();
+                      new AnalysisWorkflow(new BaselineReviewPrompter()).analyze(image, input, 1, 2);
+                      throw new IllegalStateException("Expected baseline probe cancellation");
+                  } catch (ANMJMorphCommand.Cancelled expected) {
+                      // Expected after the baseline assertions run.
+                  } finally {
+                      closeImagesCreatedAfter(existing);
+                  }
+                  require(WindowManager.getWindow("Threshold") == null, "Threshold baseline probe leaked Threshold window");
+              }
+
+              private static void verifySelectedChannelsIgnoreAreaRoi() {
+                  final ImageStack stack = new ImageStack(10, 8);
+                  stack.addSlice(new ByteProcessor(10, 8));
+                  stack.addSlice(new ByteProcessor(10, 8));
+                  final ImagePlus source = new ImagePlus("channel-selection-roi-probe", stack);
+                  source.setDimensions(2, 1, 1);
+                  source.setOpenAsHyperStack(true);
+                  source.setRoi(new Roi(2, 1, 4, 3));
+                  try {
+                      final ImagePlus selected = AnalysisWorkflow.channel(source, 1);
+                      require(selected.getWidth() == 10 && selected.getHeight() == 8,
+                          "Pre-existing area ROI cropped selected analysis channel");
+                      selected.close();
+                  } finally {
+                      source.close();
+                  }
+              }
+
+              private static void verifySelectedChannels(
+                  final int channelCount,
+                  final int muscleChannel,
+                  final int nerveChannel,
+                  final int expectedMuscle,
+                  final int expectedNerve
+              ) {
+                  final Set<Integer> existing = imageIds();
+                  ImagePlus source = null;
+                  try {
+                      final ImageStack stack = new ImageStack(2, 2);
+                      for (int channel = 1; channel <= channelCount; channel++) {
+                          final byte value = (byte) (channel * 11);
+                          stack.addSlice(new ByteProcessor(2, 2, new byte[] {value, value, value, value}, null));
+                      }
+                      source = new ImagePlus("channel-selection-probe", stack);
+                      source.setDimensions(channelCount, 1, 1);
+                      source.setOpenAsHyperStack(true);
+                      final Calibration calibration = source.getCalibration().copy();
+                      calibration.pixelWidth = 2.5;
+                      calibration.pixelHeight = 7.0;
+                      calibration.setUnit("um");
+                      source.setCalibration(calibration);
+                      final String expectedUnit = source.getCalibration().getUnit();
+
+                      final ImagePlus muscle = AnalysisWorkflow.channel(source, muscleChannel);
+                      final ImagePlus nerve = AnalysisWorkflow.channel(source, nerveChannel);
+                      source.close();
+                      source = null;
+
+                      require(muscle.getProcessor().get(0, 0) == expectedMuscle,
+                          "Muscle channel pixels changed for " + channelCount + "-channel input");
+                      require(nerve.getProcessor().get(0, 0) == expectedNerve,
+                          "Nerve channel pixels changed for " + channelCount + "-channel input");
+                      require(Double.compare(muscle.getCalibration().pixelWidth, 2.5) == 0 &&
+                              Double.compare(muscle.getCalibration().pixelHeight, 7.0) == 0,
+                          "Muscle channel calibration changed for " + channelCount + "-channel input");
+                      require(Double.compare(nerve.getCalibration().pixelWidth, 2.5) == 0 &&
+                              Double.compare(nerve.getCalibration().pixelHeight, 7.0) == 0,
+                          "Nerve channel calibration changed for " + channelCount + "-channel input");
+                      require(expectedUnit.equals(muscle.getCalibration().getUnit()) &&
+                              expectedUnit.equals(nerve.getCalibration().getUnit()),
+                          "Channel calibration unit changed for " + channelCount + "-channel input");
+                      require(muscle.getProcessor().getColorModel().getRGB(255) == 0xffffffff &&
+                              nerve.getProcessor().getColorModel().getRGB(255) == 0xffffffff,
+                          "Selected channel is not grayscale");
+                  } finally {
+                      if (source != null && source.getWindow() == null) {
+                          source.changes = false;
+                          source.close();
+                      }
+                      closeImagesCreatedAfter(existing);
+                  }
+              }
+
+              private static void analyzeOne(
+                  final Path input,
+                  final DeterministicReviewPrompter prompter,
+                  final boolean doubleYPixelSize
+              ) {
+                  final Set<Integer> existing = imageIds();
+                  final boolean blackBackground = ij.Prefs.blackBackground;
+                  try {
+                      ij.Prefs.blackBackground = true;
+                      IJ.resetEscape();
+                      ImagePlus image = ANMJMorphCommand.load(input);
+                      final ImagePlus normalized = ANMJMorphCommand.normalize(image, false);
+                      if (normalized != image) {
+                          image.changes = false;
+                          image.close();
+                          image = normalized;
+                      }
+                      image.show();
+
+                      if (doubleYPixelSize) {
+                          final ij.measure.Calibration calibration = image.getCalibration().copy();
+                          calibration.pixelHeight = calibration.pixelWidth * 2.0;
+                          image.setCalibration(calibration);
+                      }
+
+                      final AnalysisWorkflow workflow = new AnalysisWorkflow(prompter);
+                      workflow.analyze(image, input, 1, 2);
+                      require(Double.compare(ij.Prefs.get("brush.width", -1), 100.0) == 0,
+                          "Paintbrush width was not initialized to 100 pixels");
+                      require(!ij.Prefs.get("brush.overlay", false),
+                          "Paintbrush must edit image pixels, not an overlay");
+                      require(ij.Prefs.blackBackground, "Successful analysis did not restore BlackBackground");
+                  } finally {
+                      ij.Prefs.blackBackground = blackBackground;
+                      closeImagesCreatedAfter(existing);
+                  }
+              }
+
+              private static void verifyNormalizationScience() {
+                  final ImageStack ordinaryStack = new ImageStack(1, 1);
+                  ordinaryStack.addSlice(new ByteProcessor(1, 1, new byte[] {7}, null));
+                  ordinaryStack.addSlice(new ByteProcessor(1, 1, new byte[] {19}, null));
+                  final ImagePlus ordinary = new ImagePlus("ordinary.tif", ordinaryStack);
+                  ordinary.setDimensions(2, 1, 1);
+                  require(ANMJMorphCommand.normalize(ordinary, false) == ordinary, "Ordinary image should normalize in place");
+                  require(ordinary.getStack() == ordinaryStack, "Ordinary image stack identity changed");
+                  require(ordinary.getStack().getProcessor(1).get(0, 0) == 7 && ordinary.getStack().getProcessor(2).get(0, 0) == 19,
+                      "Ordinary channel pixels changed during normalization");
+
+                  final ImagePlus rgb = new ImagePlus("rgb.png",
+                      new ColorProcessor(2, 1, new int[] {0xff112233, 0xfff405a6}));
+                  final ImagePlus rgbNormalized = ANMJMorphCommand.normalize(rgb, false);
+                  require(rgbNormalized instanceof CompositeImage && rgbNormalized.getNChannels() == 3 &&
+                          ((CompositeImage) rgbNormalized).getMode() == CompositeImage.COMPOSITE,
+                      "RGB image did not become a 3-channel composite");
+                  final int[][] rgbExpected = {{0x11, 0xf4}, {0x22, 0x05}, {0x33, 0xa6}};
+                  for (int c = 1; c <= 3; c++) {
+                      require(rgbNormalized.getStack().getProcessor(c).get(0, 0) == rgbExpected[c - 1][0] &&
+                              rgbNormalized.getStack().getProcessor(c).get(1, 0) == rgbExpected[c - 1][1],
+                          "RGB channel values changed");
+                  }
+                  require("Red".equals(rgbNormalized.getStack().getSliceLabel(1)) &&
+                          "Green".equals(rgbNormalized.getStack().getSliceLabel(2)) &&
+                          "Blue".equals(rgbNormalized.getStack().getSliceLabel(3)),
+                      "RGB channel labels changed");
+                  require(((CompositeImage) rgbNormalized).getChannelLut(1).getRGB(255) == 0xffff0000 &&
+                          ((CompositeImage) rgbNormalized).getChannelLut(2).getRGB(255) == 0xff00ff00 &&
+                          ((CompositeImage) rgbNormalized).getChannelLut(3).getRGB(255) == 0xff0000ff,
+                      "RGB composite LUTs changed");
+
+                  final ImageStack twoPlanes = new ImageStack(1, 1);
+                  twoPlanes.addSlice(new ByteProcessor(1, 1, new byte[] {13}, null));
+                  twoPlanes.addSlice(new ByteProcessor(1, 1, new byte[] {29}, null));
+                  final ImagePlus reinterpret = new ImagePlus("two-plane.tif", twoPlanes);
+                  reinterpret.setDimensions(1, 2, 1);
+                  ANMJMorphCommand.normalize(reinterpret, true);
+                  require(reinterpret.getNChannels() == 2 && reinterpret.getNSlices() == 1 &&
+                          reinterpret.getStack().getProcessor(1).get(0, 0) == 13 &&
+                          reinterpret.getStack().getProcessor(2).get(0, 0) == 29,
+                      "Two-plane channel reinterpretation changed");
+
+                  final ImagePlus twoPlaneZ = twoPlaneImage("two-plane-z.tif", 31, 17);
+                  final ImagePlus projectedTwoPlane = ANMJMorphCommand.normalize(twoPlaneZ, false);
+                  require(projectedTwoPlane != twoPlaneZ && projectedTwoPlane.getNChannels() == 1 &&
+                          projectedTwoPlane.getNSlices() == 1 && projectedTwoPlane.getProcessor().get(0, 0) == 31,
+                      "Two-plane Z interpretation changed");
+
+                  assertProjectionMatchesImageJ(8, 1);
+                  assertProjectionMatchesImageJ(16, 2);
+                  assertProjectionMatchesImageJ(32, 2);
+                  assertFloatMaxMatchesImageJ(Float.NaN, 5.0f, 4.0f);
+                  assertFloatMaxMatchesImageJ(Float.NaN, Float.NaN, Float.NaN);
+                  verifyRgbZStack();
+                  verifyManyChannelProjection();
+
+                  require(ANMJMorphCommand.supported(Path.of("sample.TIFF")) &&
+                          ANMJMorphCommand.supported(Path.of("NMJ 1.LSM")) &&
+                          ANMJMorphCommand.supported(Path.of("file.CZI")) &&
+                          ANMJMorphCommand.supported(Path.of("file.JpEg")) &&
+                          !ANMJMorphCommand.supported(Path.of("notes.txt")),
+                      "Supported extension policy changed");
+
+                  final ImagePlus calibrated = new ImagePlus("mixed-units.tif", new ByteProcessor(4, 4));
+                  calibrated.getCalibration().pixelWidth = 250;
+                  calibrated.getCalibration().pixelHeight = 0.0005;
+                  calibrated.getCalibration().setUnit("nm");
+                  calibrated.getCalibration().setYUnit("mm");
+                  AnalysisWorkflow.canonicalizeCalibration(calibrated);
+                  require(Double.compare(calibrated.getCalibration().pixelWidth, 0.25) == 0 &&
+                          Double.compare(calibrated.getCalibration().pixelHeight, 0.5) == 0 &&
+                          "microns".equals(calibrated.getCalibration().getUnits()) &&
+                          "microns".equals(calibrated.getCalibration().getYUnits()),
+                      "Calibration was not canonicalized to microns");
+                  try {
+                      AnalysisWorkflow.canonicalizeCalibration(new ImagePlus("pixels.tif", new ByteProcessor(4, 4)));
+                      throw new IllegalStateException("Uncalibrated pixels were accepted");
+                  } catch (IllegalArgumentException expected) {
+                      // Expected.
+                  }
+
+                  final ImagePlus metadata = twoPlaneImage("source file.tif", 4, 9);
+                  stampMetadata(metadata);
+                  ANMJMorphCommand.normalize(metadata, true);
+                  require("source file.tif".equals(metadata.getTitle()) &&
+                          "original-source.lsm".equals(metadata.getOriginalFileInfo().fileName) &&
+                          "C:\\source data\\".equals(metadata.getOriginalFileInfo().directory) &&
+                          "provenance-metadata".equals(metadata.getProperty("Info")) &&
+                          Double.compare(metadata.getCalibration().pixelWidth, 0.25) == 0 &&
+                          Double.compare(metadata.getCalibration().pixelHeight, 0.5) == 0,
+                      "Structural normalization changed source metadata");
+
+                  final ImagePlus current = new ImagePlus("renamed-current-title.tif", new ByteProcessor(4, 4));
+                  final FileInfo info = new FileInfo();
+                  info.directory = Path.of("analysis", "source").toString() + java.io.File.separator;
+                  info.fileName = "original-on-disk-name.tif";
+                  current.setFileInfo(info);
+                  require(Path.of(info.directory).resolve(current.getTitle()).equals(ANMJMorphCommand.pathForCurrentImage(current)),
+                      "Current-image path resolution changed");
+              }
+
+              private static void assertProjectionMatchesImageJ(final int bitDepth, final int channels) {
+                  final ImagePlus actual = projectionStack(bitDepth, channels);
+                  final ImagePlus expected = ZProjector.run(projectionStack(bitDepth, channels), "max");
+                  final ImagePlus normalized = ANMJMorphCommand.normalize(actual, false);
+                  require(expected.getStackSize() == normalized.getStackSize(), "Projected stack structure changed");
+                  for (int slice = 1; slice <= normalized.getStackSize(); slice++) {
+                      final ImageProcessor a = normalized.getStack().getProcessor(slice);
+                      final ImageProcessor e = expected.getStack().getProcessor(slice);
+                      for (int pixel = 0; pixel < a.getPixelCount(); pixel++) {
+                          require(Float.floatToIntBits(a.getf(pixel)) == Float.floatToIntBits(e.getf(pixel)),
+                              bitDepth + "-bit max projection changed");
+                      }
+                  }
+              }
+
+              private static ImagePlus projectionStack(final int bitDepth, final int channels) {
+                  final ImageStack stack = new ImageStack(2, 1);
+                  for (int z = 0; z < 3; z++) {
+                      for (int channel = 0; channel < channels; channel++) {
+                          final float first = (channel + 1) * 100 + new float[] {4, 17, 9}[z];
+                          final float second = (channel + 1) * 100 + new float[] {21, 3, 15}[z];
+                          final ImageProcessor processor;
+                          if (bitDepth == 8) {
+                              processor = new ByteProcessor(2, 1, new byte[] {(byte) first, (byte) second}, null);
+                          } else if (bitDepth == 16) {
+                              processor = new ShortProcessor(2, 1, new short[] {(short) first, (short) second}, null);
+                          } else {
+                              processor = new FloatProcessor(2, 1, new float[] {first + 0.25f, second + 0.5f});
+                          }
+                          stack.addSlice(processor);
+                      }
+                  }
+                  final ImagePlus image = new ImagePlus("projection-source.tif", stack);
+                  image.setDimensions(channels, 3, 1);
+                  image.setOpenAsHyperStack(channels > 1);
+                  return image;
+              }
+
+              private static ImagePlus floatStack(final float... values) {
+                  final ImageStack stack = new ImageStack(1, 1);
+                  for (float value : values) stack.addSlice(new FloatProcessor(1, 1, new float[] {value}));
+                  final ImagePlus image = new ImagePlus("float-z.tif", stack);
+                  image.setDimensions(1, values.length, 1);
+                  return image;
+              }
+
+              private static void assertFloatMaxMatchesImageJ(final float... values) {
+                  final ImagePlus actual = ANMJMorphCommand.normalize(floatStack(values), false);
+                  final ImagePlus expected = ZProjector.run(floatStack(values), "max");
+                  require(Float.floatToIntBits(expected.getProcessor().getf(0)) ==
+                          Float.floatToIntBits(actual.getProcessor().getf(0)),
+                      "32-bit NaN max projection changed");
+              }
+
+              private static ImagePlus twoPlaneImage(final String title, final int first, final int second) {
+                  final ImageStack stack = new ImageStack(1, 1);
+                  stack.addSlice(new ByteProcessor(1, 1, new byte[] {(byte) first}, null));
+                  stack.addSlice(new ByteProcessor(1, 1, new byte[] {(byte) second}, null));
+                  final ImagePlus image = new ImagePlus(title, stack);
+                  image.setDimensions(1, 2, 1);
+                  image.setOpenAsHyperStack(true);
+                  return image;
+              }
+
+              private static void verifyRgbZStack() {
+                  final ImageStack stack = new ImageStack(2, 1);
+                  stack.addSlice(new ColorProcessor(2, 1, new int[] {0xff102030, 0xfff01020}));
+                  stack.addSlice(new ColorProcessor(2, 1, new int[] {0xff405010, 0xff20e030}));
+                  stack.addSlice(new ColorProcessor(2, 1, new int[] {0xff206070, 0xff3040d0}));
+                  final ImagePlus source = new ImagePlus("rgb-z.tif", stack);
+                  source.setDimensions(1, 3, 1);
+                  source.setOpenAsHyperStack(true);
+                  final ImagePlus normalized = ANMJMorphCommand.normalize(source, false);
+                  require(normalized instanceof CompositeImage && normalized.getNChannels() == 3 && normalized.getNSlices() == 3,
+                      "RGB Z-stack structure changed");
+                  final int[][] expected = {{64, 240}, {96, 224}, {112, 208}};
+                  for (int channel = 1; channel <= 3; channel++) {
+                      final ImagePlus selected = AnalysisWorkflow.channel(normalized, channel);
+                      require(selected.getNSlices() == 1 && selected.getProcessor().get(0, 0) == expected[channel - 1][0] &&
+                              selected.getProcessor().get(1, 0) == expected[channel - 1][1],
+                          "RGB Z-stack selected-channel maxima changed");
+                      selected.close();
+                  }
+              }
+
+              private static void verifyManyChannelProjection() {
+                  final int channels = 4, slices = 3;
+                  final ImageStack stack = new ImageStack(2, 1);
+                  for (int z = 0; z < slices; z++) {
+                      for (int channel = 0; channel < channels; channel++) {
+                          final int first = (channel + 1) * 20 + new int[] {2, 9, 5}[z];
+                          final int second = (channel + 1) * 20 + new int[] {8, 1, 7}[z];
+                          stack.addSlice(new ByteProcessor(2, 1, new byte[] {(byte) first, (byte) second}, null));
+                      }
+                  }
+                  final ImagePlus base = new ImagePlus("many-channel-z.lsm", stack);
+                  base.setDimensions(channels, slices, 1);
+                  base.setOpenAsHyperStack(true);
+                  final CompositeImage image = new CompositeImage(base, CompositeImage.COMPOSITE);
+                  stampMetadata(image);
+                  for (int channel = 1; channel <= channels; channel++) {
+                      image.setPosition(channel, 1, 1);
+                      image.setDisplayRange(channel * 20 + 1, channel * 20 + 19);
+                  }
+                  image.setPosition(1, 1, 1);
+                  final ImagePlus expected = ZProjector.run(image, "max");
+                  require(ANMJMorphCommand.normalize(image, false) == image,
+                      "Many-channel Z-stack should defer projection until channel selection");
+                  final ImagePlus selected = AnalysisWorkflow.channel(image, 4);
+                  expected.setPosition(4, 1, 1);
+                  require(selected.getNSlices() == 1 &&
+                          selected.getProcessor().get(0, 0) == expected.getProcessor().get(0, 0) &&
+                          selected.getProcessor().get(1, 0) == expected.getProcessor().get(1, 0) &&
+                          Double.compare(selected.getDisplayRangeMin(), expected.getDisplayRangeMin()) == 0 &&
+                          Double.compare(selected.getDisplayRangeMax(), expected.getDisplayRangeMax()) == 0 &&
+                          Double.compare(selected.getCalibration().pixelWidth, 0.25) == 0 &&
+                          Double.compare(selected.getCalibration().pixelHeight, 0.5) == 0,
+                      "Many-channel selected projection/display/calibration changed");
+                  selected.close();
+                  expected.close();
+              }
+
+              private static void stampMetadata(final ImagePlus image) {
+                  final Calibration calibration = image.getCalibration();
+                  calibration.pixelWidth = 0.25;
+                  calibration.pixelHeight = 0.5;
+                  calibration.pixelDepth = 1.75;
+                  calibration.setUnit("microns");
+                  final FileInfo info = new FileInfo();
+                  info.fileName = "original-source.lsm";
+                  info.directory = "C:\\source data\\";
+                  image.setFileInfo(info);
+                  image.setProperty("Info", "provenance-metadata");
+              }
+
+              private static void createRectangularFixture(final Path reference, final Path output) {
+                  final Set<Integer> existing = imageIds();
+                  try {
+                      final ImagePlus source = ANMJMorphCommand.load(reference);
+                      source.show();
+                      require(source.getWidth() >= RECT_WIDTH && source.getHeight() >= RECT_HEIGHT,
+                          "Reference is too small for rectangular fixture");
+                      source.setRoi(new Roi(0, 0, RECT_WIDTH, RECT_HEIGHT));
+                      IJ.run(source, "Duplicate...", "title=[NMJ_1_rect_384x512.tif] duplicate");
+                      final ImagePlus rectangular = WindowManager.getCurrentImage();
+                      require(rectangular != null, "Duplicate did not create rectangular fixture");
+                      require(rectangular.getWidth() == RECT_WIDTH && rectangular.getHeight() == RECT_HEIGHT,
+                          "Rectangular fixture dimensions changed");
+                      IJ.saveAs(rectangular, "Tiff", output.toString());
+                      require(Files.isRegularFile(output), "Rectangular fixture was not saved");
+                  } finally {
+                      closeImagesCreatedAfter(existing);
+                  }
+              }
+
+              private static final class DeterministicReviewPrompter implements AnalysisWorkflow.ReviewPrompter {
+                  private final String cancelAt;
+
+                  private DeterministicReviewPrompter() {
+                      this(null);
+                  }
+
+                  private DeterministicReviewPrompter(final String cancelAt) {
+                      this.cancelAt = cancelAt;
+                  }
+
+                  @Override
+                  public void review(final ImagePlus subject, final String message) {
+                      cancelIfRequested(message);
+                      if (message.startsWith("2/7 Threshold Nerve terminal.")) {
+                          require(Toolbar.getPlugInTool() instanceof BrushTool, "Screen 2 paintbrush is not selected");
+                          applyDefaultThreshold(subject, "Screen 2");
+                          return;
+                      }
+                      if (message.startsWith("3/7 Threshold Muscle Endplate.")) {
+                          require(Toolbar.getPlugInTool() instanceof BrushTool, "Screen 3 paintbrush is not selected");
+                          applyDefaultThreshold(subject, "Screen 3");
+                          return;
+                      }
+                      if (message.startsWith("Screen 4/7 Measuring Axon Width.")) {
+                          require(Toolbar.getToolId() == Toolbar.LINE, "Screen 4 line tool is not selected");
+                          synthesizeAxonWidths(subject);
+                          return;
+                      }
+                      if (message.startsWith("Screen 5/7 Erase Axon")) {
+                          require(Toolbar.getPlugInTool() instanceof BrushTool, "Screen 5 paintbrush is not selected");
+                          return;
+                      }
+                      if (message.startsWith("7/7 Congratulations-")) {
+                          return;
+                      }
+                      if (message.startsWith("WARNING: The image has a different scale on the X and Y axes.")) {
+                          return;
+                      }
+                      throw new IllegalStateException("Unexpected review prompt in deterministic direct runtime: " + message);
+                  }
+
+                  @Override
+                  public boolean confirmSegmentation(final String message) {
+                      cancelIfRequested(message);
+                      require(message.startsWith("Screen 6/7 Check segmented image."),
+                          "Unexpected segmentation confirmation message");
+                      return true;
+                  }
+
+                  private void cancelIfRequested(final String message) {
+                      if (cancelAt != null && message.startsWith(cancelAt)) throw new ANMJMorphCommand.Cancelled();
+                  }
+
+                  private void applyDefaultThreshold(final ImagePlus subject, final String screen) {
+                      require(subject != null, screen + " subject is null");
+                      final int expectedId = subject.getID();
+                      final Object processor = subject.getProcessor();
+                      ThresholdAdjuster.setMethod("Default");
+                      IJ.setAutoThreshold(subject, "Default dark");
+                      require(subject.getID() == expectedId, screen + " subject ID changed during threshold automation");
+                      require(subject.getProcessor() == processor, screen + " processor changed during threshold automation");
+                  }
+
+                  private void synthesizeAxonWidths(final ImagePlus subject) {
+                      final int[][] lines = {
+                          {100, 100, 110, 100},
+                          {100, 110, 112, 110},
+                          {100, 120, 108, 120}
+                      };
+                      for (int[] coordinates : lines) {
+                          subject.setRoi(new Line(
+                              coordinates[0], coordinates[1], coordinates[2], coordinates[3]
+                          ));
+                          IJ.run(subject, "Measure", "");
+                      }
+                  }
+              }
+
+              private static final class BaselineReviewPrompter implements AnalysisWorkflow.ReviewPrompter {
+                  @Override
+                  public void review(final ImagePlus subject, final String message) {
+                      if (!message.startsWith("2/7 Threshold Nerve terminal.")) {
+                          throw new IllegalStateException("Unexpected baseline probe prompt: " + message);
+                      }
+                      require("Default".equals(ThresholdAdjuster.getMethod()), "Threshold method inherited prior Fiji state");
+                      require(ThresholdAdjuster.isDarkBackground(), "Threshold background inherited prior Fiji state");
+                      require(ij.Prefs.get(ThresholdAdjuster.MODE_KEY, -1) == 0, "Threshold mode inherited prior Fiji state");
+                      require(ij.Prefs.get(ThresholdAdjuster.NO_RESET, false), "Threshold no-reset inherited prior Fiji state");
+                      require(!ij.Prefs.get(ThresholdAdjuster.SIXTEEN_BIT, true), "Threshold 16-bit mode inherited prior Fiji state");
+                      require(Double.compare(subject.getProcessor().getMinThreshold(), 88.0) == 0,
+                          "Threshold numeric baseline changed: " + subject.getProcessor().getMinThreshold());
+                      throw new ANMJMorphCommand.Cancelled();
+                  }
+
+                  @Override
+                  public boolean confirmSegmentation(final String message) {
+                      throw new IllegalStateException("Baseline probe reached segmentation unexpectedly");
+                  }
+              }
+
+              private static void validateCase(
+                  final Path caseDir,
+                  final String dimensions,
+                  final String inputName,
+                  final int runs,
+                  final boolean anisotropic
+              ) throws IOException {
+                  final Path csv = caseDir.resolve("input/raw_data_table.csv");
+                  final byte[] bytes = Files.readAllBytes(csv);
+                  require(bytes.length > 0 && bytes[bytes.length - 1] == '\n', "CSV must end with newline: " + csv);
+                  final String text = new String(bytes, StandardCharsets.UTF_8);
+                  require(!text.toLowerCase().contains("nan"), "CSV contains NaN: " + csv);
+                  final List<String> lines = Files.readAllLines(csv, StandardCharsets.UTF_8);
+                  require(lines.size() == runs + 2, "Unexpected CSV row count: " + csv);
+                  require(HEADER_1.equals(lines.get(0)) && HEADER_2.equals(lines.get(1)), "CSV headers changed");
+
+                  for (int i = 0; i < runs; i++) {
+                      final int spreadsheetRow = i + 3;
+                      final List<String> row = parseCsv(lines.get(i + 2));
+                      require(row.size() == 29, "CSV data row must have 29 columns");
+                      require(dimensions.equals(row.get(0)), "Image dimensions changed");
+                      require(inputName.equals(row.get(2)), "Input name changed");
+                      final String threshold = inputName.contains("rect_")
+                          ? "Nerve C2:Default[85.00000000-255.00000000]/Muscle C1:Default[62.00000000-255.00000000]"
+                          : "Nerve C2:Default[88.00000000-255.00000000]/Muscle C1:Default[62.00000000-255.00000000]";
+                      require(threshold.equals(row.get(3)), "Threshold automation changed");
+                      require(("=J" + spreadsheetRow).equals(row.get(12)), "Terminal-branch formula changed");
+                      require(("=O" + spreadsheetRow + "/M" + spreadsheetRow).equals(row.get(15)),
+                          "Average-branch formula changed");
+                      require(("=S" + spreadsheetRow + "-X" + spreadsheetRow).equals(row.get(24)),
+                          "Synaptic-contact formula changed");
+                      require(("=(S" + spreadsheetRow + "-X" + spreadsheetRow + ")/S" + spreadsheetRow + "*100")
+                          .equals(row.get(25)), "Overlap formula changed");
+                      final double achrArea = number(row, 18);
+                      final double unoccupied = number(row, 23);
+                      require(unoccupied >= 0 && unoccupied <= achrArea, "Unoccupied AChR area is physically impossible");
+                      if (!inputName.contains("rect_")) validateOracle(row, anisotropic);
+                  }
+
+                  final String stem = inputName.substring(0, inputName.lastIndexOf('.'));
+                  final Path cleaned = caseDir.resolve("input/cleaned_images");
+                  for (String prefix : new String[] {"axon_terminal", "muscle_endplate"}) {
+                      final Path output = cleaned.resolve(prefix + stem + ".tif");
+                      require(Files.isRegularFile(output) && Files.size(output) > 0, "Missing cleaned image: " + output);
+                  }
+              }
+
+              private static void validateOracle(final List<String> row, final boolean anisotropic) {
+                  if (anisotropic) {
+                      exact(row, 1, "67.47557148 x 134.95114296microns");
+                      near(row, 5, 1.31788226, 0.000001);
+                      near(row, 6, 1017.62733461, 0.0001);
+                      near(row, 7, 905.15779629, 0.0001);
+                      near(row, 14, 527.80095379, 0.0001);
+                      near(row, 17, 934.91665430, 0.0001);
+                      near(row, 18, 865.80159922, 0.0001);
+                      near(row, 19, 66.75369588, 0.0001);
+                      near(row, 20, 168.70412322, 0.0001);
+                      near(row, 21, 1423.45772254, 0.0001);
+                      near(row, 23, 474.28906864, 0.0001);
+                  } else {
+                      exact(row, 1, "67.47557148 x 67.47557148microns");
+                      near(row, 5, 1.31788226, 0.000001);
+                      near(row, 6, 635.50525379, 0.0001);
+                      near(row, 7, 452.57889814, 0.0001);
+                      near(row, 14, 331.89935592, 0.0001);
+                      near(row, 17, 586.75552449, 0.0001);
+                      near(row, 18, 432.90079961, 0.0001);
+                      near(row, 19, 33.58609418, 0.0001);
+                      near(row, 20, 107.30171646, 0.0001);
+                      near(row, 21, 711.72886127, 0.0001);
+                      near(row, 23, 237.14453432, 0.0001);
+                  }
+                  near(row, 8, 32, 0);
+                  near(row, 9, 99, 0);
+                  near(row, 10, 47, 0);
+                  near(row, 11, 2, 0);
+                  near(row, 13, 49, 0);
+                  near(row, 26, 3, 0);
+              }
+
+              private static void exact(final List<String> row, final int column, final String expected) {
+                  require(expected.equals(row.get(column)), "Column " + column + " changed: " + row.get(column));
+              }
+
+              private static void near(final List<String> row, final int column, final double expected, final double tolerance) {
+                  final double actual = number(row, column);
+                  require(Math.abs(actual - expected) <= tolerance,
+                      "Column " + column + " changed: " + actual + " expected " + expected);
+              }
+
+              private static double number(final List<String> row, final int column) {
+                  return Double.parseDouble(row.get(column));
+              }
+
+              private static List<String> parseCsv(final String line) {
+                  final List<String> fields = new ArrayList<>();
+                  final StringBuilder field = new StringBuilder();
+                  boolean quoted = false;
+                  for (int i = 0; i < line.length(); i++) {
+                      final char c = line.charAt(i);
+                      if (c == '"') {
+                          if (quoted && i + 1 < line.length() && line.charAt(i + 1) == '"') {
+                              field.append('"');
+                              i++;
+                          } else {
+                              quoted = !quoted;
+                          }
+                      } else if (c == ',' && !quoted) {
+                          fields.add(field.toString());
+                          field.setLength(0);
+                      } else {
+                          field.append(c);
+                      }
+                  }
+                  require(!quoted, "Unterminated quoted CSV field");
+                  fields.add(field.toString());
+                  return fields;
+              }
+
+              private static String sha256(final Path path) throws IOException {
+                  try {
+                      final byte[] digest = MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(path));
+                      final StringBuilder hex = new StringBuilder(digest.length * 2);
+                      for (byte value : digest) hex.append(String.format("%02x", value));
+                      return hex.toString();
+                  } catch (NoSuchAlgorithmException impossible) {
+                      throw new AssertionError(impossible);
+                  }
+              }
+
+              private static Set<Integer> imageIds() {
+                  final Set<Integer> ids = new HashSet<>();
+                  final int[] current = WindowManager.getIDList();
+                  if (current != null) {
+                      for (int id : current) {
+                          ids.add(id);
+                      }
+                  }
+                  return ids;
+              }
+
+              private static void closeImagesCreatedAfter(final Set<Integer> existing) {
+                  final int[] current = WindowManager.getIDList();
+                  if (current == null) {
+                      return;
+                  }
+                  for (int id : current) {
+                      if (!existing.contains(id)) {
+                          final ImagePlus image = WindowManager.getImage(id);
+                          if (image != null) {
+                              image.changes = false;
+                              image.close();
+                          }
+                      }
+                  }
+              }
+
+              private static void closeAllImages() {
+                  final int[] current = WindowManager.getIDList();
+                  if (current == null) {
+                      return;
+                  }
+                  for (int id : current) {
+                      final ImagePlus image = WindowManager.getImage(id);
+                      if (image != null) {
+                          image.changes = false;
+                          image.close();
+                      }
+                  }
+              }
+
+              private static void require(final boolean condition, final String message) {
+                  if (!condition) {
+                      throw new IllegalStateException(message);
+                  }
+              }
+          }
+          JAVA
+
           "$javac_bin" -proc:none -cp "$cp" -d "$classes_win" \
-            "$(winpath "src/test/java/io/github/alzeiby/anmjmorphplus/FreshFijiRuntime.java")"
+            "$(winpath "$oracle")"
           "$java_bin" -Dplugins.dir="$fiji_win" -Djava.awt.headless=false -cp "$cp" \
             io.github.alzeiby.anmjmorphplus.FreshFijiRuntime \
             "$(winpath "src/test/resources/NMJ_1.lsm")" "$(winpath "$work")" 2
