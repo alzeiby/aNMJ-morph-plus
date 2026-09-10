@@ -7,8 +7,10 @@ import ij.ImageStack;
 import ij.WindowManager;
 import ij.gui.Line;
 import ij.gui.Roi;
+import ij.gui.Toolbar;
 import ij.measure.Calibration;
 import ij.plugin.frame.ThresholdAdjuster;
+import ij.plugin.tool.BrushTool;
 import ij.process.ByteProcessor;
 import org.scijava.Context;
 import org.scijava.command.CommandInfo;
@@ -281,18 +283,22 @@ public final class FreshFijiRuntime {
         @Override
         public void review(final ImagePlus subject, final String message) {
             if (message.startsWith("2/7 Threshold Nerve terminal.")) {
+                require(Toolbar.getPlugInTool() instanceof BrushTool, "Screen 2 paintbrush is not selected");
                 applyDefaultThreshold(subject, "Screen 2");
                 return;
             }
             if (message.startsWith("3/7 Threshold Muscle Endplate.")) {
+                require(Toolbar.getPlugInTool() instanceof BrushTool, "Screen 3 paintbrush is not selected");
                 applyDefaultThreshold(subject, "Screen 3");
                 return;
             }
             if (message.startsWith("Screen 4/7 Measuring Axon Width.")) {
+                require(Toolbar.getToolId() == Toolbar.LINE, "Screen 4 line tool is not selected");
                 synthesizeAxonWidths(subject);
                 return;
             }
             if (message.startsWith("Screen 5/7 Erase Axon")) {
+                require(Toolbar.getPlugInTool() instanceof BrushTool, "Screen 5 paintbrush is not selected");
                 return;
             }
             if (message.startsWith("7/7 Congratulations-")) {

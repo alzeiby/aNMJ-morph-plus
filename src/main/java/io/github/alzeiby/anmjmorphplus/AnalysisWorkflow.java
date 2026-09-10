@@ -50,7 +50,6 @@ final class AnalysisWorkflow {
     private static final String SCREEN6 = "Screen 6/7 Check segmented image. \nDoes this image look similar to the reference image? \nIf not, please untick the checkbox below. \n-\nHint: Do not press 'cancel' as this will stop the macro running to completion. \nNotes: See manuscript and instruction video for examples of incorrect segmentation. \n-\nPress OK.";
 
     private final ReviewPrompter prompter;
-    private int paintbrushToolId = -1;
 
     AnalysisWorkflow() {
         this(new ImageJReviewPrompter());
@@ -98,11 +97,11 @@ final class AnalysisWorkflow {
         nerveReference.setTitle("Nerve reference");
         nerveReference.show();
 
-        selectPaintbrush();
         Toolbar.setForegroundColor(Color.BLACK);
 
         makeCurrent(nerve);
         IJ.run(nerve, "Threshold...", "");
+        Toolbar.getInstance().setTool("Paintbrush Tool");
         prompter.review(nerve, SCREEN2);
         final String thresholdNerve = threshold(nerve);
         Prefs.blackBackground = false;
@@ -117,6 +116,7 @@ final class AnalysisWorkflow {
         segmentMuscle.show();
         makeCurrent(muscle);
         IJ.run(muscle, "Threshold...", "");
+        Toolbar.getInstance().setTool("Paintbrush Tool");
         prompter.review(muscle, SCREEN3);
         final String thresholdEndplate = threshold(muscle);
         IJ.run(muscle, "Make Binary", "thresholded remaining black");
@@ -125,7 +125,7 @@ final class AnalysisWorkflow {
         IJ.saveAs(muscle, "Tiff", endplatePath.toString());
         segmentMuscle.hide();
 
-        Toolbar.getInstance().setTool(4);
+        Toolbar.getInstance().setTool(Toolbar.LINE);
         makeCurrent(nerve);
         Analyzer.setMeasurements(0);
         Analyzer.setPrecision(8);
@@ -138,7 +138,7 @@ final class AnalysisWorkflow {
         final double axonDiameter = meanLength(widths);
         clearResults();
 
-        selectPaintbrush();
+        Toolbar.getInstance().setTool("Paintbrush Tool");
         Toolbar.setForegroundColor(Color.WHITE);
         makeCurrent(nerve);
         prompter.review(nerve, SCREEN5);
@@ -355,11 +355,6 @@ final class AnalysisWorkflow {
         Prefs.set("brush.width", width);
         Prefs.set("brush.overlay", false);
         new BrushTool().run("");
-        paintbrushToolId = Toolbar.getToolId();
-    }
-
-    private void selectPaintbrush() {
-        Toolbar.getInstance().setTool(paintbrushToolId);
     }
 
     private static void closeImage(final ImagePlus image) {
