@@ -292,8 +292,10 @@ final class AnalysisWorkflow {
         }
         clearResults();
         installPaintbrush(100);
+        resetThreshold();
 
         ImagePlus muscle = null, nerve = null, nerveReference = null, segmentMuscle = null, segmented = null;
+        final boolean blackBackground = Prefs.blackBackground;
         try {
         muscle = channel(image, muscleChannel);
         nerve = channel(image, nerveChannel);
@@ -421,6 +423,7 @@ final class AnalysisWorkflow {
         write(csv, String.join(",", fields) + "\n", StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } finally {
             closeThreshold();
+            Prefs.blackBackground = blackBackground;
             closeImage(segmented);
             closeImage(segmentMuscle);
             closeImage(nerveReference);
@@ -587,6 +590,15 @@ final class AnalysisWorkflow {
         if (threshold instanceof ThresholdAdjuster) {
             ((ThresholdAdjuster) threshold).close();
         }
+    }
+
+    private static void resetThreshold() {
+        closeThreshold();
+        ThresholdAdjuster.setMethod("Default");
+        Prefs.set(ThresholdAdjuster.MODE_KEY, 0);
+        Prefs.set(ThresholdAdjuster.DARK_BACKGROUND, true);
+        Prefs.set(ThresholdAdjuster.NO_RESET, true);
+        Prefs.set(ThresholdAdjuster.SIXTEEN_BIT, false);
     }
 
     private static void clearResults() {

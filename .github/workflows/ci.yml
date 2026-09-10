@@ -20,10 +20,10 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
-      - run: xvfb-run -a mvn -B -ntp verify
+      - run: mvn -B -ntp verify
       - name: Keep auxiliary code out
         run: |
-          test -z "$(git ls-files '*.py' '*.ps1' 'tests/**' 'scripts/**')"
+          test -z "$(git ls-files '*.py' '*.ps1' 'tests/**' 'scripts/**' 'src/test/java/**')"
           test ! -e "aNMJ-morph macro.txt"
       - name: Check changed-file whitespace
         if: github.event_name == 'pull_request'
