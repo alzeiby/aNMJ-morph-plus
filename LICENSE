@@ -1,40 +1,48 @@
-aNMJ-morph+ License and Attribution
+MIT License
 
-This repository is a modified distribution of aNMJ-morph and its supporting material.
+Copyright (c) 2026 Abdullah Alzeiby
 
-Original material
------------------
-The original aNMJ-morph macro and supporting dataset were created by Minty, Hoppen, Boehm, and colleagues at the University of Edinburgh and distributed through Edinburgh DataShare:
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Upstream attribution and license notice
+---------------------------------------
+
+The MIT License above applies to the aNMJ-morph+ Java implementation and other
+original contributions authored by Abdullah Alzeiby, to the extent he holds
+copyright in those contributions. It does not relicense original aNMJ-morph
+material.
+
+The aNMJ-morph+ workflow is adapted from aNMJ-morph by Gavin Minty, Alex
+Hoppen, Ines Boehm, Abrar Alhindi, Larissa Gibb, Ellie Potter, Boris Wagner,
+Janice Miller, Richard Skipworth, Tom Gillingwater, Ross Jones, and colleagues.
+The original material is distributed by the University of Edinburgh through
+Edinburgh DataShare under Creative Commons Attribution 4.0 International
+(CC BY 4.0):
 
 https://doi.org/10.7488/ds/2625
+https://creativecommons.org/licenses/by/4.0/
 
-The original material is licensed under the Creative Commons Attribution 4.0 International license (CC BY 4.0).
+CC BY 4.0 continues to govern the original licensed material contained in or
+adapted by this project. When using or redistributing material subject to that
+license, preserve the required attribution, license notice, source link, and
+indication of modifications. No endorsement by the original creators, the
+University of Edinburgh, Abdullah Alzeiby, or Creative Commons is implied.
 
-aNMJ-morph+ adaptation and modifications
-----------------------------------------
-The aNMJ-morph+ adaptation, modifications, and additions in this repository are authored by Abdullah Alzeiby:
-
-https://github.com/alzeiby/aNMJ-morph-plus
-
-Unless otherwise noted, those modifications and additions are also made available under CC BY 4.0.
-
-Creative Commons Attribution 4.0 International
-----------------------------------------------
-License: https://creativecommons.org/licenses/by/4.0/
-Legal code: https://creativecommons.org/licenses/by/4.0/legalcode
-
-Under CC BY 4.0, you may share and adapt the licensed material for any purpose, including commercially, provided that you give appropriate credit, provide a link to the license, and indicate if changes were made. You may not apply legal terms or technological measures that legally restrict others from doing anything the license permits.
-
-When redistributing this repository or material derived from it:
-
-1. Credit the original aNMJ-morph creators for the original material.
-2. Credit Abdullah Alzeiby for the aNMJ-morph+ adaptation and modifications when using or redistributing this modified version.
-3. Cite or link the original Edinburgh DataShare dataset above.
-4. Link to the aNMJ-morph+ repository above when using or redistributing this modified version.
-5. State that this repository is a modified version and indicate further changes you make.
-6. Include a link to the CC BY 4.0 license.
-7. Preserve attribution and licensing notices supplied with the licensed material.
-
-No endorsement by the original creators, the University of Edinburgh, Abdullah Alzeiby, or Creative Commons is implied.
-
-The licensed material is provided without warranties to the extent permitted by applicable law. See the CC BY 4.0 legal code linked above for the complete license terms, including the disclaimer of warranties and limitation of liability.
+Third-party dependencies are not covered by this MIT grant and retain their
+respective licenses and notices.

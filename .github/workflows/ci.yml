@@ -23,7 +23,7 @@ jobs:
       - run: mvn -B -ntp verify
       - name: Keep auxiliary code out
         run: |
-          test -z "$(git ls-files '*.py' '*.ps1' 'tests/**' 'scripts/**' 'src/test/java/**')"
+          test -z "$(git ls-files '*.py' '*.ps1' 'tests/**' 'scripts/**' 'src/test/**')"
           test ! -e "aNMJ-morph macro.txt"
       - name: Check changed-file whitespace
         if: github.event_name == 'pull_request'

@@ -11,7 +11,7 @@ This fork preserves the original seven-step workflow as a Java/SciJava Fiji plug
 - Prompts before interpreting ambiguous one-channel/two-plane images as Keyence-style channel exports.
 - Rejects time series (`T > 1`) instead of silently analyzing one frame.
 - Supports interactive batch processing across common microscopy and image formats.
-- Includes CI checks, release packaging, citation metadata, and a pinned scientific regression fixture.
+- Includes CI checks, release packaging, citation metadata, and a pinned scientific regression against the upstream reference dataset.
 
 ## Requirements
 
@@ -23,8 +23,8 @@ This fork preserves the original seven-step workflow as a Java/SciJava Fiji plug
 The analysis runtime is implemented as a Java/SciJava Fiji plugin. The command is packaged as a normal Maven JAR and appears at **Analyze > Tools > aNMJ-morph+**. Image processing is delegated to the corresponding Fiji/ImageJ commands and APIs rather than reimplemented in project code.
 
 1. Install Fiji.
-2. Build the plugin with `mvn package`.
-3. Copy `target/anmj-morph-plus-0.1.0-SNAPSHOT.jar` into Fiji's `plugins/` directory and restart Fiji or refresh menus.
+2. Download the versioned `aNMJ-morph-plus-v*.jar` from GitHub Releases, or build it with `mvn package`.
+3. Copy the JAR into Fiji's `plugins/` directory and restart Fiji or refresh menus.
 4. Run **Analyze > Tools > aNMJ-morph+**.
 
 Developers can also install a build directly with `mvn -Dscijava.app.directory=/path/to/Fiji.app/`.
@@ -81,7 +81,7 @@ The plugin writes:
 
 The threshold column records the selected nerve/muscle channel numbers, ImageJ threshold method, and accepted numeric bounds, so channel assignment and manual slider adjustments remain reproducible in the saved metadata.
 
-The original tutorial video, spreadsheet, and full reference-image set remain available from the Edinburgh DataShare dataset [3] and Git history. The repository keeps only `NMJ_1.lsm` under `src/test/resources/` for the pinned scientific regression oracle.
+The original tutorial video, spreadsheet, and reference-image set remain available from the Edinburgh DataShare dataset [3] and Git history. No reference images are tracked in this repository; the pinned scientific regression downloads `NMJ_1.lsm` from Edinburgh DataShare at runtime and verifies its SHA-256 before use.
 
 ### Branch analysis and rectangular-image compatibility
 
@@ -115,12 +115,12 @@ Original method and supporting references:
 
 ## Development
 
-GitHub Actions runs the Maven/build checks, release-package smoke checks, and a workflow-generated Java oracle against pinned Fiji and the retained NMJ_1 reference fixture. No Java test sources are tracked in the repository.
+GitHub Actions runs the Maven/build checks, release-package smoke checks, and a workflow-generated Java oracle against pinned Fiji. The oracle downloads the upstream NMJ_1 reference from Edinburgh DataShare and checksum-verifies it at runtime. No test sources or test resources are tracked in the repository.
 
-Tags matching `v*` validate the repository and build a release archive containing only the installable Java plugin JAR, README, `LICENSE`, `CITATION.cff`, and a SHA-256 checksum.
+Tags matching `v*` validate that the tag matches the Maven version, then publish the installable plugin JAR plus a release archive containing the JAR, README, `LICENSE`, and `CITATION.cff`, with a SHA-256 checksum for the archive.
 
 ## License
 
-The original aNMJ-morph material is distributed under **CC BY 4.0**. The aNMJ-morph+ adaptation, modifications, and additions are authored by **Abdullah Alzeiby** and are also made available under **CC BY 4.0** unless otherwise noted.
+The aNMJ-morph+ Java implementation and other original contributions by **Abdullah Alzeiby** are licensed under the **MIT License**. Original aNMJ-morph material remains licensed by its original authors under **CC BY 4.0**; the MIT license does not replace those upstream terms or attribution requirements.
 
 See [`LICENSE`](LICENSE) for attribution, provenance, and license terms.

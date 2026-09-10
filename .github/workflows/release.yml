@@ -8,7 +8,11 @@ permissions:
   contents: write
 
 jobs:
+  scientific-validation:
+    uses: ./.github/workflows/fiji-runtime.yml
+
   release:
+    needs: scientific-validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -17,15 +21,22 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
-      - run: xvfb-run -a mvn -B -ntp verify
+      - run: mvn -B -ntp verify
+      - name: Verify release version
+        run: |
+          version="$(sed -n '/<artifactId>anmj-morph-plus<\/artifactId>/{n;s:.*<version>\(.*\)</version>.*:\1:p;}' pom.xml)"
+          test -n "$version"
+          test "${GITHUB_REF_NAME#v}" = "$version"
       - name: Package release
         run: |
           set -euo pipefail
           package="aNMJ-morph-plus-${GITHUB_REF_NAME}"
+          asset="aNMJ-morph-plus-${GITHUB_REF_NAME}.jar"
           mkdir -p "dist/$package"
           cp LICENSE CITATION.cff README.md "dist/$package/"
           jar="$(find target -maxdepth 1 -name 'anmj-morph-plus-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name '*-tests.jar' -print -quit)"
           test -n "$jar"
+          cp "$jar" "dist/$asset"
           cp "$jar" "dist/$package/aNMJ-morph-plus.jar"
           cd dist
           zip -qr "$package.zip" "$package"
@@ -37,5 +48,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           package="aNMJ-morph-plus-${GITHUB_REF_NAME}"
-          gh release create "$GITHUB_REF_NAME" "dist/$package.zip" "dist/$package.zip.sha256" \
+          asset="aNMJ-morph-plus-${GITHUB_REF_NAME}.jar"
+          gh release create "$GITHUB_REF_NAME" "dist/$asset" "dist/$package.zip" "dist/$package.zip.sha256" \
             --generate-notes --title "$GITHUB_REF_NAME"
