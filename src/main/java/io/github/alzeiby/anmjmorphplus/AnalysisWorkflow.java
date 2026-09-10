@@ -114,6 +114,7 @@ final class AnalysisWorkflow {
         closeImage(nerveReference);
 
         final ImagePlus segmentMuscle = muscle.duplicate();
+        segmentMuscle.setIgnoreGlobalCalibration(true);
         segmentMuscle.setTitle("Muscle reference");
         muscle.show();
         segmentMuscle.show();
@@ -130,8 +131,6 @@ final class AnalysisWorkflow {
 
         Toolbar.getInstance().setTool(Toolbar.LINE);
         makeCurrent(nerve);
-        Analyzer.setMeasurements(0);
-        Analyzer.setPrecision(8);
         Analyzer.setRedirectImage(null);
         prompter.review(nerve, SCREEN4);
         final ResultsTable widths = Analyzer.getResultsTable();
@@ -220,7 +219,8 @@ final class AnalysisWorkflow {
     }
 
     static void canonicalizeCalibration(final ImagePlus image) {
-        final Calibration calibration = image.getCalibration();
+        image.setIgnoreGlobalCalibration(true);
+        final Calibration calibration = image.getLocalCalibration();
         calibration.pixelWidth = microns(calibration.pixelWidth, calibration.getXUnit());
         calibration.pixelHeight = microns(calibration.pixelHeight, calibration.getYUnit());
         calibration.setUnit("micron");
@@ -254,12 +254,14 @@ final class AnalysisWorkflow {
         final ImageStack stack = ChannelSplitter.getChannel(source, channel);
         stack.setColorModel(LookUpTable.createGrayscaleColorModel(source.isInvertedLut()));
         final ImagePlus copy = source.createImagePlus();
+        copy.setIgnoreGlobalCalibration(true);
         copy.setStack("C" + channel + "-" + source.getTitle(), stack);
         if (copy.getNSlices() == 1) {
             copy.setDisplayRange(displayMin, displayMax);
             return copy;
         }
         final ImagePlus projected = ZProjector.run(copy, "max");
+        projected.setIgnoreGlobalCalibration(true);
         projected.setDisplayRange(displayMin, displayMax);
         copy.flush();
         return projected;
