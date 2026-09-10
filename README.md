@@ -113,6 +113,10 @@ Original method and supporting references:
 4. **Landini G.** Advanced shape analysis with ImageJ. *Proceedings of the Second ImageJ User and Developer Conference*. 2008;116-121.
 5. **Schindelin J, Arganda-Carreras I, Frise E, et al.** Fiji: an open-source platform for biological-image analysis. *Nature Methods*. 2012;9:676-682. https://doi.org/10.1038/nmeth.2019
 
+### Original aNMJ-morph attribution
+
+aNMJ-morph+ is a substantially modified Java implementation of the aNMJ-morph workflow described by Minty, Hoppen, Boehm, and colleagues. The original aNMJ-morph material is available from Edinburgh DataShare at https://doi.org/10.7488/ds/2625 and is licensed under Creative Commons Attribution 4.0 International: https://creativecommons.org/licenses/by/4.0/. The original authors and source are credited here for provenance and attribution; no original aNMJ-morph macro, reference image, or other upstream source file is distributed in this repository.
+
 ## Development
 
 GitHub Actions runs the Maven/build checks, release-package smoke checks, and a workflow-generated Java oracle against pinned Fiji. The oracle downloads the upstream NMJ_1 reference from Edinburgh DataShare and checksum-verifies it at runtime. No test sources or test resources are tracked in the repository.
@@ -121,6 +125,6 @@ Tags matching `v*` validate that the tag matches the Maven version, then publish
 
 ## License
 
-The aNMJ-morph+ Java implementation and other original contributions by **Abdullah Alzeiby** are licensed under the **MIT License**. Original aNMJ-morph material remains licensed by its original authors under **CC BY 4.0**; the MIT license does not replace those upstream terms or attribution requirements.
+The source code in this repository is licensed under the **MIT License**. Third-party dependencies retain their respective licenses.
 
-See [`LICENSE`](LICENSE) for attribution, provenance, and license terms.
+See [`LICENSE`](LICENSE) for the MIT license terms. Original aNMJ-morph provenance and attribution are documented in the citation section above.

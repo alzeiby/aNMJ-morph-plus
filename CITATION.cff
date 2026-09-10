@@ -6,7 +6,8 @@ authors:
   - family-names: "Alzeiby"
     given-names: "Abdullah"
 repository-code: "https://github.com/alzeiby/aNMJ-morph-plus"
-version: "0.1.0"
+license: MIT
+version: "0.1.1"
 date-released: 2026-09-10
 abstract: "A maintained adaptation of aNMJ-morph with rectangular-image support, safer image dimensionality handling, and automated repository validation."
 keywords:
