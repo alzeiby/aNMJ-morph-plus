@@ -58,7 +58,8 @@ public class ANMJMorphCommand implements Command {
     }
 
     private static void analyze(ImagePlus image, final Path path) {
-        final boolean twoPlanesAsChannels = image.getNChannels() == 1 && image.getNSlices() == 2 && chooseTwoPlanesAsChannels();
+        final boolean twoPlanesAsChannels = image.getBitDepth() != 24 && image.getNChannels() == 1 &&
+            image.getNSlices() == 2 && chooseTwoPlanesAsChannels();
         final ImagePlus normalized = normalize(image, twoPlanesAsChannels);
         if (normalized != image) {
             image.changes = false;
@@ -142,8 +143,8 @@ public class ANMJMorphCommand implements Command {
 
     static ImagePlus normalize(final ImagePlus image, final boolean twoPlanesAsChannels) {
         if (image.getNFrames() > 1) throw new IllegalArgumentException(TIME_SERIES_ERROR);
-        if (image.getNChannels() == 1 && image.getNSlices() == 1 && image.getBitDepth() == 24) {
-            return CompositeConverter.makeComposite(image);
+        if (image.getNChannels() == 1 && image.getBitDepth() == 24) {
+            return normalize(CompositeConverter.makeComposite(image), false);
         }
         if (image.getNChannels() == 1 && image.getNSlices() == 2 && twoPlanesAsChannels) {
             image.setDimensions(2, 1, 1);
