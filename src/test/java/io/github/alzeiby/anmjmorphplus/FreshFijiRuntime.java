@@ -101,6 +101,8 @@ public final class FreshFijiRuntime {
         try {
             verifyChannelSelectionScience();
             verifyGlobalCalibrationIsolation(reference);
+            verifyCancellationCleanup(squareInput, "2/7 Threshold Nerve terminal.");
+            verifyCancellationCleanup(squareInput, "Screen 6/7 Check segmented image.");
             final Path rectangularInput = rectangularInputDir.resolve("NMJ_1_rect_384x512.tif");
             createRectangularFixture(reference, rectangularInput);
             final Path anisotropicInput = anisotropicInputDir.resolve("NMJ_1_aniso_y2.lsm");
@@ -182,6 +184,28 @@ public final class FreshFijiRuntime {
             if (image != null) image.close();
             calibrationScope.setGlobalCalibration(previous);
         }
+    }
+
+    private static void verifyCancellationCleanup(final Path input, final String cancelAt) {
+        final Set<Integer> existing = imageIds();
+        try {
+            ImagePlus image = ANMJMorphCommand.load(input);
+            final ImagePlus normalized = ANMJMorphCommand.normalize(image, false);
+            if (normalized != image) {
+                image.close();
+                image = normalized;
+            }
+            image.show();
+            new AnalysisWorkflow(new DeterministicReviewPrompter(cancelAt)).analyze(image, input, 1, 2);
+            throw new IllegalStateException("Expected cancellation at " + cancelAt);
+        } catch (ANMJMorphCommand.Cancelled expected) {
+            // Expected.
+        }
+        final Set<Integer> leaked = imageIds();
+        leaked.removeAll(existing);
+        closeImagesCreatedAfter(existing);
+        require(leaked.isEmpty(), "Cancellation leaked plugin-owned image windows at " + cancelAt);
+        require(WindowManager.getWindow("Threshold") == null, "Cancellation leaked Threshold window at " + cancelAt);
     }
 
     private static void verifySelectedChannelsIgnoreAreaRoi() {
@@ -312,8 +336,19 @@ public final class FreshFijiRuntime {
     }
 
     private static final class DeterministicReviewPrompter implements AnalysisWorkflow.ReviewPrompter {
+        private final String cancelAt;
+
+        private DeterministicReviewPrompter() {
+            this(null);
+        }
+
+        private DeterministicReviewPrompter(final String cancelAt) {
+            this.cancelAt = cancelAt;
+        }
+
         @Override
         public void review(final ImagePlus subject, final String message) {
+            cancelIfRequested(message);
             if (message.startsWith("2/7 Threshold Nerve terminal.")) {
                 require(Toolbar.getPlugInTool() instanceof BrushTool, "Screen 2 paintbrush is not selected");
                 applyDefaultThreshold(subject, "Screen 2");
@@ -344,9 +379,14 @@ public final class FreshFijiRuntime {
 
         @Override
         public boolean confirmSegmentation(final String message) {
+            cancelIfRequested(message);
             require(message.startsWith("Screen 6/7 Check segmented image."),
                 "Unexpected segmentation confirmation message");
             return true;
+        }
+
+        private void cancelIfRequested(final String message) {
+            if (cancelAt != null && message.startsWith(cancelAt)) throw new ANMJMorphCommand.Cancelled();
         }
 
         private void applyDefaultThreshold(final ImagePlus subject, final String screen) {
