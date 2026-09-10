@@ -100,6 +100,7 @@ public final class FreshFijiRuntime {
         final ImageJ imageJ = new ImageJ(ImageJ.NO_SHOW);
         try {
             verifyChannelSelectionScience();
+            verifyGlobalCalibrationIsolation(reference);
             final Path rectangularInput = rectangularInputDir.resolve("NMJ_1_rect_384x512.tif");
             createRectangularFixture(reference, rectangularInput);
             final Path anisotropicInput = anisotropicInputDir.resolve("NMJ_1_aniso_y2.lsm");
@@ -150,6 +151,37 @@ public final class FreshFijiRuntime {
         verifySelectedChannels(3, 3, 1, 33, 11);
         verifySelectedChannels(10, 10, 3, 110, 33);
         verifySelectedChannelsIgnoreAreaRoi();
+    }
+
+    private static void verifyGlobalCalibrationIsolation(final Path reference) {
+        final ImagePlus calibrationScope = new ImagePlus();
+        final Calibration previous = calibrationScope.getGlobalCalibration();
+        ImagePlus image = null;
+        try {
+            calibrationScope.setGlobalCalibration(null);
+            final ImagePlus baseline = ANMJMorphCommand.load(reference);
+            final double expected = baseline.getLocalCalibration().pixelWidth;
+            baseline.close();
+
+            final Calibration bogus = new Calibration();
+            bogus.pixelWidth = 99.0;
+            bogus.pixelHeight = 77.0;
+            bogus.setUnit("mm");
+            calibrationScope.setGlobalCalibration(bogus);
+
+            image = ANMJMorphCommand.load(reference);
+            require(Double.compare(image.getLocalCalibration().pixelWidth, expected) == 0,
+                "Global Calibration changed Bio-Formats file calibration");
+            require(Double.compare(calibrationScope.getGlobalCalibration().pixelWidth, 99.0) == 0,
+                "Bio-Formats load did not restore Global Calibration");
+            image = ANMJMorphCommand.normalize(image, false);
+            AnalysisWorkflow.canonicalizeCalibration(image);
+            require(Double.compare(image.getCalibration().pixelWidth, expected) == 0,
+                "Global Calibration overrode analysis calibration");
+        } finally {
+            if (image != null) image.close();
+            calibrationScope.setGlobalCalibration(previous);
+        }
     }
 
     private static void verifySelectedChannelsIgnoreAreaRoi() {

@@ -122,6 +122,9 @@ public class ANMJMorphCommand implements Command {
         final String name = path.getFileName().toString();
         if (!supported(path)) throw new IllegalArgumentException("Unsupported image format: " + name);
         final String absolute = path.toAbsolutePath().normalize().toString();
+        final ImagePlus calibrationScope = new ImagePlus();
+        final ij.measure.Calibration globalCalibration = calibrationScope.getGlobalCalibration();
+        calibrationScope.setGlobalCalibration(null);
         try {
             final ImagePlus[] images = BF.openImagePlus(absolute);
             if (images == null || images.length != 1 || images[0] == null) {
@@ -132,10 +135,13 @@ public class ANMJMorphCommand implements Command {
             return images[0];
         } catch (FormatException | IOException e) {
             throw new IllegalStateException("Could not open image: " + name, e);
+        } finally {
+            calibrationScope.setGlobalCalibration(globalCalibration);
         }
     }
 
     static ImagePlus normalize(final ImagePlus image, final boolean twoPlanesAsChannels) {
+        image.setIgnoreGlobalCalibration(true);
         if (image.getNFrames() > 1) throw new IllegalArgumentException(TIME_SERIES_ERROR);
         if (image.getNChannels() == 1 && image.getBitDepth() == 24) {
             return normalize(CompositeConverter.makeComposite(image), false);
