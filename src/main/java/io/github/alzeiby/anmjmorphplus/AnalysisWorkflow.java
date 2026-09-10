@@ -204,7 +204,7 @@ final class AnalysisWorkflow {
         final String[] fields = {
             quote(width + " x " + height),
             quote(format(pixelSizeX * width) + " x " + format(pixelSizeY * height) + sizeUnit),
-            quote(inputPath.getFileName().toString()), thresholdNerve + "/" + thresholdEndplate, "",
+            quote(inputPath.getFileName().toString()), "Nerve C" + nerveChannel + ":" + thresholdNerve + "/Muscle C" + muscleChannel + ":" + thresholdEndplate, "",
             Double.isNaN(axonDiameter) ? "" : format(axonDiameter),
             format(nerveMeasurement[1]), format(nerveMeasurement[0]), format(skeleton.getNumOfTrees()), format(terminalBranches),
             format(tripleJunctions), format(quadrupleJunctions), quote("=J" + row), format(branchPoints),

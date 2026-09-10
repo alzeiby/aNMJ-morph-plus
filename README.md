@@ -77,7 +77,7 @@ The plugin writes:
 - `raw_data_table.csv` — quantitative measurements and derived spreadsheet formulas.
 - `cleaned_images/` — the cleaned nerve-terminal and muscle-endplate TIFF images.
 
-The threshold column records both the selected ImageJ threshold method and the accepted numeric bounds, so manual slider adjustments remain reproducible in the saved metadata.
+The threshold column records the selected nerve/muscle channel numbers, ImageJ threshold method, and accepted numeric bounds, so channel assignment and manual slider adjustments remain reproducible in the saved metadata.
 
 The original tutorial video, spreadsheet, and full reference-image set remain available from the Edinburgh DataShare dataset [3] and Git history. The repository keeps only `NMJ_1.lsm` under `src/test/resources/` for the pinned scientific regression oracle.
 
