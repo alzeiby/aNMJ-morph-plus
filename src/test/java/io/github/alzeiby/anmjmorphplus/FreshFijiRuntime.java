@@ -365,8 +365,8 @@ public final class FreshFijiRuntime {
             require(dimensions.equals(row.get(0)), "Image dimensions changed");
             require(inputName.equals(row.get(2)), "Input name changed");
             final String threshold = inputName.contains("rect_")
-                ? "Default[85.00000000-255.00000000]/Default[62.00000000-255.00000000]"
-                : "Default[88.00000000-255.00000000]/Default[62.00000000-255.00000000]";
+                ? "Nerve C2:Default[85.00000000-255.00000000]/Muscle C1:Default[62.00000000-255.00000000]"
+                : "Nerve C2:Default[88.00000000-255.00000000]/Muscle C1:Default[62.00000000-255.00000000]";
             require(threshold.equals(row.get(3)), "Threshold automation changed");
             require(("=J" + spreadsheetRow).equals(row.get(12)), "Terminal-branch formula changed");
             require(("=O" + spreadsheetRow + "/M" + spreadsheetRow).equals(row.get(15)),
