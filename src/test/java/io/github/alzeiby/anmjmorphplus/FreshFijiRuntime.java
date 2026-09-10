@@ -248,6 +248,10 @@ public final class FreshFijiRuntime {
 
             final AnalysisWorkflow workflow = new AnalysisWorkflow(prompter);
             workflow.analyze(image, input, 1, 2);
+            require(Double.compare(ij.Prefs.get("brush.width", -1), 100.0) == 0,
+                "Paintbrush width was not initialized to 100 pixels");
+            require(!ij.Prefs.get("brush.overlay", false),
+                "Paintbrush must edit image pixels, not an overlay");
         } finally {
             closeImagesCreatedAfter(existing);
         }
