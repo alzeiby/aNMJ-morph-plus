@@ -98,12 +98,12 @@
     },
     "unoccupied_achr_area": {
       "column": 23,
-      "expected": 8631.61821697,
+      "expected": 474.28906864,
       "abs_tolerance": 0.0001
     },
     "number_of_achr_clusters": {
       "column": 26,
-      "expected": 1,
+      "expected": 3,
       "abs_tolerance": 0
     }
   }

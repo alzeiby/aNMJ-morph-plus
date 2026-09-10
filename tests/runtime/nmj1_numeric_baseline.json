@@ -22,7 +22,7 @@
     "bio_formats": "8.5.0",
     "fiji_archive": "fiji-win64-20260718.zip",
     "fiji_archive_sha256": "5267fc8470c4f87cb948848898cc0dc62f74b69a78f3abf2a8643fe3a4af6c4a",
-    "note": "The image-processing oracle remains pinned to the historical NMJ_1 workflow, while branch topology and calibrated centerline length intentionally use Fiji Analyze Skeleton 3.4.2. Terminal branches are degree-1 graph tips excluding isolated pixels; branch points are grouped graph junctions."
+    "note": "The oracle uses Fiji Analyze Skeleton 3.4.2 for calibrated branch topology/length, direct binary AChR occupancy for overlap, and segmented-particle intersection with the endplate footprint for AChR clusters. Terminal branches are degree-1 graph tips excluding isolated pixels; branch points are grouped graph junctions."
   },
   "exact_fields": {
     "image_dimensions_pixels": {
@@ -115,12 +115,12 @@
     },
     "unoccupied_achr_area": {
       "column": 23,
-      "expected": 4315.80853971,
+      "expected": 237.14453432,
       "abs_tolerance": 0.0001
     },
     "number_of_achr_clusters": {
       "column": 26,
-      "expected": 1,
+      "expected": 3,
       "abs_tolerance": 0
     }
   }

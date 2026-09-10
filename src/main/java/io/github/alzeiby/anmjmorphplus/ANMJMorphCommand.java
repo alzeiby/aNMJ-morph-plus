@@ -119,13 +119,15 @@ public class ANMJMorphCommand implements Command {
 
     static ImagePlus load(final Path path) {
         final String name = path.getFileName().toString();
+        final String lower = name.toLowerCase(Locale.ROOT);
         if (!supported(path)) throw new IllegalArgumentException("Unsupported image format: " + name);
         final String absolute = path.toAbsolutePath().normalize().toString();
         ImagePlus image = null;
         try {
-            if (name.toLowerCase(Locale.ROOT).matches(".*\\.tiff?$")) {
+            if (lower.matches(".*\\.(tif|tiff|png|jpe?g|bmp)$")) {
                 image = IJ.openImage(absolute);
-            } else {
+            }
+            if (image == null) {
                 final ImagePlus[] images = BF.openImagePlus(absolute);
                 if (images != null && images.length == 1) image = images[0];
                 else if (images != null) for (ImagePlus opened : images) if (opened != null) opened.close();
@@ -148,7 +150,8 @@ public class ANMJMorphCommand implements Command {
             image.setOpenAsHyperStack(true);
             return image;
         }
-        return image.getNSlices() > 1 ? ZProjector.run(image, "max") : image;
+        return image.getNSlices() > 1 && image.getNChannels() <= 2
+            ? ZProjector.run(image, "max") : image;
     }
 
     static boolean supported(final Path path) {

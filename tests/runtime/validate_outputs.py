@@ -119,6 +119,14 @@ def validate_case(
             raise AssertionError(f"Row {offset} Analyze Skeleton branch-point count is not numeric: {row[13]!r}") from exc
         if row[15] != f"=O{offset}/M{offset}":
             raise AssertionError(f"Row {offset} average-branch-length formula is wrong: {row[15]!r}")
+        if row[24] != f"=S{offset}-X{offset}" or row[25] != f"=(S{offset}-X{offset})/S{offset}*100":
+            raise AssertionError(f"Row {offset} synaptic-contact/overlap formulas are wrong")
+        achr_area = float(row[18])
+        unoccupied = float(row[23])
+        if not 0.0 <= unoccupied <= achr_area:
+            raise AssertionError(
+                f"Row {offset} unoccupied AChR area {unoccupied} is outside [0, AChR area {achr_area}]"
+            )
         if numerical_baseline is not None:
             validate_numeric_oracle(row, numerical_baseline, offset)
 

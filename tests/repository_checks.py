@@ -45,16 +45,23 @@ def main() -> None:
 
     # Preserve the scientific method while delegating image operations to ImageJ/Fiji.
     for marker in (
-        'IJ.run(original.nerve, "Threshold...", "")',
-        'IJ.run(original.nerve, "Despeckle", "")',
-        'IJ.run(original.nerve, "Skeletonize", "")',
-        'IJ.run(original.muscle, "Subtract Background...", "rolling=50 create")',
-        'IJ.run(segment.muscle, "Find Maxima...", "noise=10 output=[Segmented Particles]")',
-        'IJ.run(finalAverage, "Analyze Particles...", "display summarize")',
-        'ZProjector.run(overlapConcat, "avg")',
-        'ZProjector.run(finalConcat, "avg")',
+        'IJ.run(nerve, "Threshold...", "")',
+        'IJ.run(nerve, "Skeletonize", "")',
+        'new RankFilters().rank(nerve.getProcessor(), 1.0, RankFilters.MEDIAN)',
+        'new RankFilters().rank(muscle.getProcessor(), 1.0, RankFilters.MEDIAN)',
+        'new BackgroundSubtracter().rollingBallBackground(',
+        'new MaximumFinder().findMaxima(',
+        'ThresholdToSelection.run(image)',
+        'new ParticleAnalyzer(ParticleAnalyzer.SHOW_NONE, 0, particles, 0, Double.POSITIVE_INFINITY).analyze(segmented)',
+        'copyBits(intermediate.getProcessor(), 0, 0, Blitter.AND)',
     ):
         require(marker in analysis, f"Direct ImageJ/Fiji operation changed or disappeared: {marker}")
+
+    require('IJ.run(segmentMuscle, "Find Maxima...' not in analysis and
+            'ImageProcessor.NO_THRESHOLD' in analysis and 'MaximumFinder.SEGMENTED' in analysis,
+            "Cluster segmentation returned to command/window state instead of explicit MaximumFinder semantics")
+    require('"Create Selection"' not in analysis,
+            "Automated mask measurements returned to command/global-window selection state")
 
     require("AnalyzeSkeleton_" in analysis and "edge.getLength()" in analysis,
             "Branch length is not measured from calibrated Analyze Skeleton graph edges")
@@ -69,10 +76,29 @@ def main() -> None:
             "Custom anisotropic skeleton implementation returned")
     require("<artifactId>AnalyzeSkeleton_</artifactId>" in pom,
             "Analyze Skeleton dependency is missing")
-    require("setIm5D(false)" in analysis, "Overlap concatenation must not open as 4D")
-    require("setIm5D(true)" in analysis, "Stage-6 concatenation must retain legacy 4D option")
+    require("prompter.review(nerve, SCREEN5);\n        final double unoccupiedAchrArea = unoccupiedArea(muscle, nerve);" in analysis,
+            "Overlap must use direct post-axon-erasure nerve-terminal occupancy")
+    require("Concatenator" not in analysis and "openTiff" not in analysis,
+            "Obsolete concatenate/TIFF-reopen analysis path returned")
+    require("Fill Holes" not in analysis,
+            "Known AChR-cluster undercounting Fill Holes step returned")
+    require("source.getNChannels() <= 9" not in analysis,
+            "Selected channels are still ignored for >9-channel images")
+    require("new Duplicator().run(" in analysis and "source.getNSlices()" in analysis and
+            'ZProjector.run(copy, "max")' in analysis and "projected.setDisplayRange(displayMin, displayMax)" in analysis and
+            "ChannelArranger" not in analysis and "ChannelSplitter" not in analysis,
+            "Selected channels must be extracted/projected directly while preserving threshold-review display scaling")
+    require('image.getNChannels() <= 2' in command,
+            "Many-channel Z stacks are again projecting unused channels before channel selection")
+    require("source.deleteRoi();" in analysis,
+            "Pre-existing area ROIs can crop Duplicator channel extraction and corrupt measurements")
+    require('matches(".*\\\\.(tif|tiff|png|jpe?g|bmp)$")' in command and
+            "if (image == null)" in command and "BF.openImagePlus" in command,
+            "Fast native raster loading with Bio-Formats fallback disappeared")
     require("new BrushTool().run(\"\")" in analysis, "Paintbrush must use ImageJ BrushTool directly")
     require("Paintbrush Tool Options..." not in analysis, "Macro-only paintbrush command returned")
+    require(analysis.count("closeThreshold();") == 1,
+            "Threshold Adjuster is being closed/reopened instead of reused between the two manual threshold stages")
 
     # Keep the 29-column output shape while replacing obsolete connectivity diagnostics.
     require("CSV_HEADER_1" in analysis and "CSV_HEADER_2" in analysis, "CSV headers are not owned by Java")
