@@ -12,7 +12,6 @@ import ij.plugin.frame.ThresholdAdjuster;
 import ij.process.ByteProcessor;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -119,7 +118,35 @@ public final class DirectJavaAnalysisRuntime {
 
     private static void verifyChannelSelectionScience() {
         verifySelectedChannels(3, 3, 1, 33, 11);
-        verifySelectedChannels(10, 10, 3, 11, 22);
+        verifySelectedChannels(10, 10, 3, 110, 33);
+        verifySelectedChannelsIgnoreAreaRoi();
+    }
+
+    private static void verifySelectedChannelsIgnoreAreaRoi() {
+        final ImageStack stack = new ImageStack(10, 8);
+        stack.addSlice(new ByteProcessor(10, 8));
+        stack.addSlice(new ByteProcessor(10, 8));
+        final ImagePlus source = new ImagePlus("channel-selection-roi-probe", stack);
+        source.setDimensions(2, 1, 1);
+        source.setOpenAsHyperStack(true);
+        source.setRoi(new Roi(2, 1, 4, 3));
+        try {
+            final Method channel = AnalysisWorkflow.class.getDeclaredMethod(
+                "channel", ImagePlus.class, int.class
+            );
+            channel.setAccessible(true);
+            final ImagePlus selected = (ImagePlus) channel.invoke(null, source, 1);
+            try {
+                require(selected.getWidth() == 10 && selected.getHeight() == 8,
+                    "Pre-existing area ROI cropped selected analysis channel");
+            } finally {
+                selected.close();
+            }
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Could not run ROI channel-selection scientific probe", e);
+        } finally {
+            source.close();
+        }
     }
 
     private static void verifySelectedChannels(
@@ -147,17 +174,12 @@ public final class DirectJavaAnalysisRuntime {
             source.setCalibration(calibration);
             final String expectedUnit = source.getCalibration().getUnit();
 
-            final Method splitSelected = AnalysisWorkflow.class.getDeclaredMethod(
-                "splitSelected", ImagePlus.class, int.class, int.class
+            final Method channel = AnalysisWorkflow.class.getDeclaredMethod(
+                "channel", ImagePlus.class, int.class
             );
-            splitSelected.setAccessible(true);
-            final Object channels = splitSelected.invoke(null, source, muscleChannel, nerveChannel);
-            final Field muscleField = channels.getClass().getDeclaredField("muscle");
-            final Field nerveField = channels.getClass().getDeclaredField("nerve");
-            muscleField.setAccessible(true);
-            nerveField.setAccessible(true);
-            final ImagePlus muscle = (ImagePlus) muscleField.get(channels);
-            final ImagePlus nerve = (ImagePlus) nerveField.get(channels);
+            channel.setAccessible(true);
+            final ImagePlus muscle = (ImagePlus) channel.invoke(null, source, muscleChannel);
+            final ImagePlus nerve = (ImagePlus) channel.invoke(null, source, nerveChannel);
 
             require(muscle.getProcessor().get(0, 0) == expectedMuscle,
                 "Muscle channel pixels changed for " + channelCount + "-channel input");

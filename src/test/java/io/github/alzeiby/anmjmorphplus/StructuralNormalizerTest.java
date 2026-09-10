@@ -116,6 +116,48 @@ public class StructuralNormalizerTest {
     }
 
     @Test
+    public void manyChannelZStackProjectsOnlyRequestedChannelWithExactImageJMaxPixels() {
+        final int channels = 4;
+        final int slices = 3;
+        final ImageStack stack = new ImageStack(2, 1);
+        for (int z = 0; z < slices; z++) {
+            for (int channel = 0; channel < channels; channel++) {
+                final int first = (channel + 1) * 20 + new int[] {2, 9, 5}[z];
+                final int second = (channel + 1) * 20 + new int[] {8, 1, 7}[z];
+                stack.addSlice("c" + (channel + 1) + "-z" + (z + 1),
+                    new ByteProcessor(2, 1, new byte[] {(byte) first, (byte) second}, null));
+            }
+        }
+        final ImagePlus base = new ImagePlus("many-channel-z.lsm", stack);
+        base.setDimensions(channels, slices, 1);
+        base.setOpenAsHyperStack(true);
+        final CompositeImage image = new CompositeImage(base, CompositeImage.COMPOSITE);
+        stampMetadata(image);
+        for (int channel = 1; channel <= channels; channel++) {
+            image.setPosition(channel, 1, 1);
+            image.setDisplayRange(channel * 20 + 1, channel * 20 + 19);
+        }
+        image.setPosition(1, 1, 1);
+
+        final ImagePlus expectedAll = ZProjector.run(image, "max");
+        final ImagePlus normalized = ANMJMorphCommand.normalize(image, false);
+        final ImagePlus selected = AnalysisWorkflow.channel(normalized, 4);
+
+        assertSame(image, normalized);
+        assertEquals(1, selected.getNChannels());
+        assertEquals(1, selected.getNSlices());
+        assertEquals(channelPixel(expectedAll, 4), selected.getProcessor().get(0, 0));
+        assertEquals(expectedAll.getStack().getProcessor(expectedAll.getStackIndex(4, 1, 1)).get(1, 0),
+            selected.getProcessor().get(1, 0));
+        expectedAll.setPosition(4, 1, 1);
+        assertEquals(expectedAll.getDisplayRangeMin(), selected.getDisplayRangeMin(), 0.0);
+        assertEquals(expectedAll.getDisplayRangeMax(), selected.getDisplayRangeMax(), 0.0);
+        assertEquals(0.25, selected.getCalibration().pixelWidth, 0.0);
+        assertEquals(0.5, selected.getCalibration().pixelHeight, 0.0);
+        assertEquals("microns", selected.getCalibration().getUnit());
+    }
+
+    @Test
     public void structuralChangesPreserveTitleCalibrationAndSourceProvenance() {
         final ImagePlus image = oneChannelTwoPlaneImage("source file.tif", 4, 9);
         stampMetadata(image);
