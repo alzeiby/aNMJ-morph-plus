@@ -65,6 +65,7 @@ TIFF files are opened directly with ImageJ; microscopy formats that require it a
 | RGB image | Converted to separate channels before channel selection. |
 | `C=1, Z=2, T=1` | Prompts for either a two-channel Keyence/two-page interpretation or a real Z stack. |
 | Real Z stack | Maximum-intensity projected before the 2D workflow. |
+| Physical calibration | X/Y length units are converted to microns; uncalibrated pixel units or unknown units are rejected. |
 | `T > 1` | Rejected; reduce to one time point before analysis. |
 
 The analysis image, threshold-reference copy, and segmentation copy all use the same selected channel ordering.
