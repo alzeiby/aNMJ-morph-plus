@@ -127,7 +127,9 @@ final class AnalysisWorkflow {
 
         Toolbar.getInstance().setTool(4);
         makeCurrent(nerve);
-        setMeasurements(0);
+        Analyzer.setMeasurements(0);
+        Analyzer.setPrecision(8);
+        Analyzer.setRedirectImage(null);
         prompter.review(nerve, SCREEN4);
         final ResultsTable widths = Analyzer.getResultsTable();
         if (widths != null && widths.size() != 0 && widths.size() != 3) {
@@ -169,10 +171,9 @@ final class AnalysisWorkflow {
         new BackgroundSubtracter().rollingBallBackground(
             muscle.getProcessor(), 50, true, false, false, true, true
         );
-        final ImagePlus intermediate = muscle;
-        IJ.run(intermediate, "Make Binary", "thresholded remaining black");
-        selectForeground(intermediate);
-        final double[] endplateMeasurement = measure(intermediate);
+        IJ.run(muscle, "Make Binary", "thresholded remaining black");
+        selectForeground(muscle);
+        final double[] endplateMeasurement = measure(muscle);
 
         IJ.run(segmentMuscle, "Make Binary", "");
         if (segmentMuscle.isInvertedLut()) segmentMuscle.getProcessor().invert();
@@ -187,13 +188,13 @@ final class AnalysisWorkflow {
         segmented.getProcessor().invert();
         segmented.updateAndDraw();
         final boolean imageAlright = prompter.confirmSegmentation(SCREEN6);
-        segmented.getProcessor().copyBits(intermediate.getProcessor(), 0, 0, Blitter.AND);
+        segmented.getProcessor().copyBits(muscle.getProcessor(), 0, 0, Blitter.AND);
         final ResultsTable particles = new ResultsTable();
         new ParticleAnalyzer(ParticleAnalyzer.SHOW_NONE, 0, particles, 0, Double.POSITIVE_INFINITY).analyze(segmented);
         final double numberOfClusters = particles.size();
         closeImage(segmentMuscle);
         closeImage(segmented);
-        closeImage(intermediate);
+        closeImage(muscle);
 
         final Path csv = parent.resolve("raw_data_table.csv");
         final int row = prepareCsv(csv);
@@ -216,7 +217,7 @@ final class AnalysisWorkflow {
     }
 
     static ImagePlus channel(final ImagePlus source, final int channel) {
-        source.setC(channel);
+        source.setPositionWithoutUpdate(channel, source.getZ(), source.getT());
         final double displayMin = source.getDisplayRangeMin(), displayMax = source.getDisplayRangeMax();
         final ImageStack stack = ChannelSplitter.getChannel(source, channel);
         stack.setColorModel(LookUpTable.createGrayscaleColorModel(source.isInvertedLut()));
@@ -290,9 +291,8 @@ final class AnalysisWorkflow {
 
     private static String threshold(final ImagePlus image) {
         final ImageProcessor processor = image.getProcessor();
-        if (!processor.isThreshold()) return ThresholdAdjuster.getMethod() + "[none]";
-        return ThresholdAdjuster.getMethod() + "[" + format(processor.getMinThreshold()) + "-" +
-            format(processor.getMaxThreshold()) + "]";
+        return ThresholdAdjuster.getMethod() + (processor.isThreshold()
+            ? "[" + format(processor.getMinThreshold()) + "-" + format(processor.getMaxThreshold()) + "]" : "[none]");
     }
 
     private static String quote(final String value) {
@@ -347,13 +347,8 @@ final class AnalysisWorkflow {
     private static void clearResults() {
         Analyzer.setUnsavedMeasurements(false);
         Analyzer.resetCounter();
-        closeWindow("Results");
-    }
-
-    private static void setMeasurements(final int measurements) {
-        Analyzer.setMeasurements(measurements);
-        Analyzer.setPrecision(8);
-        Analyzer.setRedirectImage(null);
+        final Window results = WindowManager.getWindow("Results");
+        if (results != null) results.dispose();
     }
 
     private void installPaintbrush(final int width) {
@@ -364,13 +359,6 @@ final class AnalysisWorkflow {
 
     private void selectPaintbrush() {
         Toolbar.getInstance().setTool(paintbrushToolId);
-    }
-
-    private static void closeWindow(final String title) {
-        final Window window = WindowManager.getWindow(title);
-        if (window != null) {
-            window.dispose();
-        }
     }
 
     private static void closeImage(final ImagePlus image) {
