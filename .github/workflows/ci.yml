@@ -21,7 +21,7 @@ jobs:
           java-version: "21"
           cache: maven
       - run: mvn -B -ntp verify
-      - name: Keep auxiliary code out
+      - name: Check repository layout
         run: |
           test -z "$(git ls-files '*.py' '*.ps1' 'tests/**' 'scripts/**' 'src/test/**')"
           test ! -e "aNMJ-morph macro.txt"
