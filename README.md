@@ -1,57 +1,63 @@
 # aNMJ-morph+
 
-A maintained Fiji/ImageJ adaptation of **aNMJ-morph** by **Abdullah Alzeiby** for quantitative neuromuscular junction (NMJ) morphology analysis.
+aNMJ-morph+ is a Fiji/ImageJ plugin for quantitative neuromuscular junction (NMJ) morphology analysis, based on the original **aNMJ-morph** workflow by Minty, Hoppen, Boehm, and colleagues.
 
-This fork preserves the original seven-step workflow as a Java/SciJava Fiji plugin while adding rectangular-image support, safer image dimensionality handling, broader batch input support, and automated repository checks. It is **not the official upstream aNMJ-morph distribution**.
+This repository is an independent Java implementation maintained by Abdullah Alzeiby. It is not the official upstream aNMJ-morph distribution.
 
-## Highlights
+## What it changes
 
-- Supports rectangular images instead of assuming a square frame.
-- Handles RGB images and real Z stacks more safely.
-- Prompts before interpreting ambiguous one-channel/two-plane images as Keyence-style channel exports.
-- Rejects time series (`T > 1`) instead of silently analyzing one frame.
-- Supports interactive batch processing across common microscopy and image formats.
-- Includes CI checks, release packaging, citation metadata, and a pinned scientific regression against the upstream reference dataset.
+Compared with the original macro workflow, aNMJ-morph+ adds:
+
+- rectangular-image support;
+- explicit handling of RGB images, multi-channel images, and Z stacks;
+- a prompt for ambiguous one-channel/two-plane inputs such as Keyence exports;
+- rejection of time series (`T > 1`);
+- recursive batch input;
+- Bio-Formats loading for supported files;
+- branch measurements from Fiji Analyze Skeleton rather than the historical pixel-count heuristic.
+
+The interactive seven-step analysis workflow is otherwise preserved.
 
 ## Requirements
 
-- [Fiji](https://fiji.sc/) / ImageJ
+- [Fiji](https://fiji.sc/)
 - Fiji's bundled **Analyze Skeleton** plugin
 
 ## Installation
 
-The analysis runtime is implemented as a Java/SciJava Fiji plugin. The command is packaged as a normal Maven JAR and appears at **Analyze > Tools > aNMJ-morph+**. Image processing is delegated to the corresponding Fiji/ImageJ commands and APIs rather than reimplemented in project code.
-
-1. Install Fiji.
-2. Download the versioned `aNMJ-morph-plus-v*.jar` from GitHub Releases, or build it with `mvn package`.
-3. Copy the JAR into Fiji's `plugins/` directory and restart Fiji or refresh menus.
+1. Download the versioned `aNMJ-morph-plus-v*.jar` from GitHub Releases, or build the project with `mvn package`.
+2. Copy the JAR into Fiji's `plugins/` directory.
+3. Restart Fiji or refresh the menus.
 4. Run **Analyze > Tools > aNMJ-morph+**.
 
-Developers can also install a build directly with `mvn -Dscijava.app.directory=/path/to/Fiji.app/`.
+For development builds, Maven can install directly into Fiji:
 
-The plugin is implemented entirely in Java. Historical IJM versions remain available through Git history and the original dataset citation below; they are not part of the current source or runtime.
-
-Java owns single-image selection, batch traversal/session orchestration, supported-format routing, loading, structural normalization, interactive review, measurements, segmentation, cleaned-image output, and the 29-column CSV. RGB conversion, Z projection, channel arrangement/splitting, thresholding, morphology operations, particle analysis, and related processing use Fiji/ImageJ implementations directly. Supported files are loaded through Bio-Formats for one consistent metadata-aware path.
+```bash
+mvn -Dscijava.app.directory=/path/to/Fiji.app/
+```
 
 ## Usage
 
 ### Single image
 
-Run **Analyze > Tools > aNMJ-morph+**. If no image is open, choose **Single image** and select the file. You can also open an NMJ image first and then run the command.
+Run **Analyze > Tools > aNMJ-morph+**. With no image open, choose **Single image** and select a file. With an image already open, the plugin analyzes the current image.
 
-Then:
+The workflow then asks you to:
 
-1. Resolve the dimensionality prompt if the input is ambiguous.
-2. Select the muscle-endplate and nerve-terminal channels.
-3. Follow the seven on-screen steps for thresholding, axon measurement/cleanup, segmentation review, and output.
+1. resolve ambiguous input dimensions when necessary;
+2. choose the muscle-endplate and nerve-terminal channels;
+3. review the two thresholds;
+4. measure axon width;
+5. erase the axon;
+6. review the segmented endplate.
 
-Each image starts its first Threshold window from a deterministic ImageJ `Default` dark-background baseline (red threshold display, 8-bit histogram mode). You can adjust the method and bounds interactively; the muscle threshold then inherits any within-image choices made during the nerve-threshold step.
+Thresholding starts from ImageJ's `Default` dark-background configuration for each image. The saved CSV records the selected channel numbers, threshold method, and accepted numeric bounds.
 
 ### Batch mode
 
-Run **Analyze > Tools > aNMJ-morph+** with **no image open**, choose **Batch folder**, and select the directory. Java searches recursively, skips generated `cleaned_images` directories, and processes supported images one at a time. A file error is logged and the batch continues; cancelling an interactive step stops the batch.
+With no image open, run the plugin and choose **Batch folder**. Files are processed recursively in a deterministic order. Generated `cleaned_images` directories are skipped.
 
-Batch mode remains interactive. Channel selection, ambiguous two-plane interpretation, threshold review, axon measurements/cleanup, and segmentation review are performed for each image.
+Batch processing remains interactive. A file-level error is logged and processing continues; cancelling an interactive step stops the batch.
 
 Supported extensions:
 
@@ -63,68 +69,65 @@ All supported files are opened through Bio-Formats.
 
 | Input | Behavior |
 | --- | --- |
-| Multi-channel image | User selects the muscle-endplate and nerve-terminal channels. |
-| RGB image | Converted to separate channels before channel selection. |
-| `C=1, Z=2, T=1` | Prompts for either a two-channel Keyence/two-page interpretation or a real Z stack. |
-| Real Z stack | Maximum-intensity projected before the 2D workflow. |
-| Physical calibration | X/Y length units are converted to microns; uncalibrated pixel units or unknown units are rejected. |
-| `T > 1` | Rejected; reduce to one time point before analysis. |
-
-The analysis image, threshold-reference copy, and segmentation copy all use the same selected channel ordering.
+| Multi-channel image | Choose the muscle-endplate and nerve-terminal channels. |
+| RGB image | Convert to separate channels before channel selection. |
+| `C=1, Z=2, T=1` | Choose between a two-channel interpretation and a real Z stack. |
+| Real Z stack | Maximum-intensity projection before the 2D workflow. |
+| Physical calibration | Convert X/Y length units to microns; reject pixel-only or unknown units. |
+| `T > 1` | Reject the image. |
 
 ## Outputs
 
-The plugin writes:
+Each analysis writes:
 
-- `raw_data_table.csv` — quantitative measurements and derived spreadsheet formulas.
-- `cleaned_images/` — the cleaned nerve-terminal and muscle-endplate TIFF images.
+- `raw_data_table.csv` — the 29-column measurement table used by aNMJ-morph;
+- `cleaned_images/` — cleaned nerve-terminal and muscle-endplate TIFFs.
 
-The threshold column records the selected nerve/muscle channel numbers, ImageJ threshold method, and accepted numeric bounds, so channel assignment and manual slider adjustments remain reproducible in the saved metadata.
+The first two metadata columns record image dimensions as `width x height`, so downstream code written for the original square-image assumption may need updating.
 
-The original tutorial video, spreadsheet, and reference-image set remain available from the Edinburgh DataShare dataset [3] and Git history. No reference images are tracked in this repository; the pinned scientific regression downloads `NMJ_1.lsm` from Edinburgh DataShare at runtime and verifies its SHA-256 before use.
+## Branch measurements
 
-### Branch analysis and rectangular-image compatibility
+The original macro estimated branch length from skeleton foreground pixels and branch points from a fixed correction applied to junction pixels. aNMJ-morph+ uses Fiji Analyze Skeleton instead:
 
-The original macro estimated total branch length from the number of foreground skeleton pixels and estimated branch points from a fixed correction applied to junction-pixel counts. aNMJ-morph+ now delegates those measurements to Fiji Analyze Skeleton: total branch length is the sum of calibrated graph-edge lengths, so horizontal, vertical, and diagonal steps use their actual X/Y physical calibration; terminal branches remain the original biological quantity of degree-1 terminal tips, with isolated one-pixel components excluded; and branch points are the grouped graph junction count rather than the historical `0.28` pixel heuristic.
+- total branch length is the sum of calibrated graph-edge lengths;
+- terminal branches are degree-1 terminal tips, excluding isolated one-pixel components;
+- branch points are grouped graph junctions.
 
-The CSV remains 29 columns wide. The four former Binary Connectivity diagnostic columns are now `Skeleton Trees`, `Terminal Tips`, `Triple Junctions`, and `Quadruple Junctions`. Because the branch method is intentionally corrected, branch length and branch-point values are not numerically identical to historical aNMJ-morph output. On the pinned NMJ_1 reference, terminal branches remain 99, branch points change from 45.36 to 49, and total length changes from 292.70164895 µm to 331.89935592 µm.
+The CSV is still 29 columns wide. Four former Binary Connectivity diagnostic columns are now `Skeleton Trees`, `Terminal Tips`, `Triple Junctions`, and `Quadruple Junctions`.
 
-The plugin still warns on unequal X/Y sampling because pixel-domain preprocessing remains dependent on acquisition sampling density even though Analyze Skeleton reports calibrated geometry. The first two CSV metadata columns contain `width x height` values rather than a single scalar side length, so downstream scripts that parse those columns may need to be updated.
+On the pinned `NMJ_1` reference image, the corrected branch analysis reports 99 terminal branches, 49 branch points, and 331.89935592 µm total branch length. The historical macro reports 99, 45.36, and 292.70164895 µm respectively.
 
-## Validation and scientific use
+Unequal X/Y sampling still triggers a warning because preprocessing is pixel-based even though branch geometry is calibrated.
 
-The original aNMJ-morph implementation was experimentally validated against NMJ-morph [1,2]. The fork-specific changes—including rectangular-image support, RGB/channel normalization, Keyence two-page interpretation, revised Z handling, and broader batch I/O—have not independently been validated on a new biological dataset.
+## Validation
 
-For publication-grade use, validate the modified workflow on representative images from your acquisition pipeline and compare key outputs against the original workflow or manually verified measurements.
+The repository includes a GitHub Actions regression run against a checksum-pinned Fiji build and the upstream `NMJ_1.lsm` reference image. It checks plugin discovery, input normalization, channel selection, calibration handling, threshold initialization, cancellation cleanup, output structure, and numerical results for square, rectangular, and anisotropic cases.
+
+The original aNMJ-morph method was experimentally validated in the published work cited below. The changes in this repository have not been independently validated on a new biological dataset. For publication use, validate the workflow on representative images from your acquisition pipeline.
 
 ## Citation
 
-If you use **aNMJ-morph+**, cite this repository **in addition to** the original aNMJ-morph work. GitHub can generate citation formats from `CITATION.cff` using **Cite this repository**.
+If you use aNMJ-morph+, cite this repository and the original aNMJ-morph paper.
 
-**aNMJ-morph+ software**
+**Software**
 
 Abdullah Alzeiby. *aNMJ-morph+*. https://github.com/alzeiby/aNMJ-morph-plus
 
-Original method and supporting references:
+**Original method**
 
-1. **Minty G, Hoppen A, Boehm I, et al.** aNMJ-morph: a simple macro for rapid analysis of neuromuscular junction morphology. *Royal Society Open Science*. 2020;7:200128. https://doi.org/10.1098/rsos.200128
-2. **Jones RA, Reich CD, Dissanayake KN, et al.** NMJ-morph reveals principal components of synaptic morphology influencing structure-function relationships at the neuromuscular junction. *Open Biology*. 2016;6:160240. https://doi.org/10.1098/rsob.160240
-3. **Minty G, Hoppen A, Boehm I, et al.** aNMJ-morph macro [dataset]. Edinburgh DataShare, University of Edinburgh. 2019. https://doi.org/10.7488/ds/2625
-4. **Landini G.** Advanced shape analysis with ImageJ. *Proceedings of the Second ImageJ User and Developer Conference*. 2008;116-121.
-5. **Schindelin J, Arganda-Carreras I, Frise E, et al.** Fiji: an open-source platform for biological-image analysis. *Nature Methods*. 2012;9:676-682. https://doi.org/10.1038/nmeth.2019
+1. Minty G, Hoppen A, Boehm I, et al. aNMJ-morph: a simple macro for rapid analysis of neuromuscular junction morphology. *Royal Society Open Science*. 2020;7:200128. https://doi.org/10.1098/rsos.200128
+2. Jones RA, Reich CD, Dissanayake KN, et al. NMJ-morph reveals principal components of synaptic morphology influencing structure-function relationships at the neuromuscular junction. *Open Biology*. 2016;6:160240. https://doi.org/10.1098/rsob.160240
+3. Minty G, Hoppen A, Boehm I, et al. aNMJ-morph macro [dataset]. Edinburgh DataShare, University of Edinburgh. 2019. https://doi.org/10.7488/ds/2625
+4. Schindelin J, Arganda-Carreras I, Frise E, et al. Fiji: an open-source platform for biological-image analysis. *Nature Methods*. 2012;9:676-682. https://doi.org/10.1038/nmeth.2019
 
-### Original aNMJ-morph attribution
-
-aNMJ-morph+ is a substantially modified Java implementation of the aNMJ-morph workflow described by Minty, Hoppen, Boehm, and colleagues. The original aNMJ-morph material is available from Edinburgh DataShare at https://doi.org/10.7488/ds/2625 and is licensed under Creative Commons Attribution 4.0 International: https://creativecommons.org/licenses/by/4.0/. The original authors and source are credited here for provenance and attribution; no original aNMJ-morph macro, reference image, or other upstream source file is distributed in this repository.
+The original aNMJ-morph material is distributed through Edinburgh DataShare under CC BY 4.0. No original macro or reference image is distributed in this repository.
 
 ## Development
 
-GitHub Actions runs the Maven/build checks, release-package smoke checks, and a workflow-generated Java oracle against pinned Fiji. The oracle downloads the upstream NMJ_1 reference from Edinburgh DataShare and checksum-verifies it at runtime. No test sources or test resources are tracked in the repository.
+`mvn verify` builds the plugin. GitHub Actions also runs the pinned-Fiji regression and release-package checks. The regression downloads the upstream `NMJ_1` dataset at runtime and verifies its checksum before use.
 
-Tags matching `v*` validate that the tag matches the Maven version, then publish the installable plugin JAR plus a release archive containing the JAR, README, `LICENSE`, and `CITATION.cff`, with a SHA-256 checksum for the archive.
+Tags matching `v*` publish a versioned JAR, a ZIP containing the JAR and repository metadata, and a SHA-256 checksum.
 
 ## License
 
-The source code in this repository is licensed under the **MIT License**. Third-party dependencies retain their respective licenses.
-
-See [`LICENSE`](LICENSE) for the MIT license terms. Original aNMJ-morph provenance and attribution are documented in the citation section above.
+The code in this repository is licensed under the MIT License. See [`LICENSE`](LICENSE).
